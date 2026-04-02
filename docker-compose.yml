@@ -1,0 +1,14 @@
+services:
+  cloud:
+    build: .
+    ports:
+      - "8200:8200"
+    env_file:
+      - .env
+    volumes:
+      - cloud-data:/app/data
+      - ./api:/app/api  # Dev hot-reload
+    restart: unless-stopped
+
+volumes:
+  cloud-data:
