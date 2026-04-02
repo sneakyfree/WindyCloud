@@ -16,9 +16,10 @@ from api.app.config import settings
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     """Startup and shutdown events."""
-    # TODO: Initialize DB engine, R2 client, provider connections
+    from api.app.db.engine import init_db
+
+    await init_db()
     yield
-    # TODO: Cleanup connections
 
 
 def create_app() -> FastAPI:
@@ -29,6 +30,11 @@ def create_app() -> FastAPI:
         lifespan=lifespan,
     )
 
+    # Rate limiting
+    from api.app.middleware.rate_limit import RateLimitMiddleware
+
+    app.add_middleware(RateLimitMiddleware, requests_per_minute=120)
+
     app.add_middleware(
         CORSMiddleware,
         allow_origins=settings.cors_origins_list,
@@ -37,19 +43,19 @@ def create_app() -> FastAPI:
         allow_headers=["*"],
     )
 
-    # Import and include routers
+    # Routers
     from api.app.routes.health import router as health_router
+    from api.app.routes.storage import router as storage_router
+    from api.app.routes.archive import router as archive_router
 
     app.include_router(health_router)
+    app.include_router(storage_router, prefix="/api/v1/storage", tags=["storage"])
+    app.include_router(archive_router, prefix="/api/v1/archive", tags=["archive"])
 
     # TODO: Include these as they're built
-    # from api.app.routes.storage import router as storage_router
-    # from api.app.routes.archive import router as archive_router
     # from api.app.routes.compute import router as compute_router
     # from api.app.routes.servers import router as servers_router
     # from api.app.routes.billing import router as billing_router
-    # app.include_router(storage_router, prefix="/api/v1/storage", tags=["storage"])
-    # app.include_router(archive_router, prefix="/api/v1/archive", tags=["archive"])
     # app.include_router(compute_router, prefix="/api/v1/compute", tags=["compute"])
     # app.include_router(servers_router, prefix="/api/v1/servers", tags=["servers"])
     # app.include_router(billing_router, prefix="/api/v1/billing", tags=["billing"])
