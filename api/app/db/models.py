@@ -108,3 +108,32 @@ class ComputeUsageRecord(Base):
     __table_args__ = (
         Index("ix_compute_usage_identity_month", "identity_id", "month", unique=True),
     )
+
+
+class ServerRecord(Base):
+    """VPS server instance metadata."""
+
+    __tablename__ = "servers"
+
+    id: Mapped[str] = mapped_column(
+        String(36), primary_key=True, default=lambda: str(uuid.uuid4())
+    )
+    identity_id: Mapped[str] = mapped_column(String(36), nullable=False, index=True)
+    plan_id: Mapped[str] = mapped_column(String(50), nullable=False)
+    region: Mapped[str] = mapped_column(String(50), nullable=False)
+    image: Mapped[str] = mapped_column(String(100), nullable=False)
+    status: Mapped[str] = mapped_column(String(20), default="provisioning")
+    provider_instance_id: Mapped[str | None] = mapped_column(String(100), nullable=True)
+    ip_address: Mapped[str | None] = mapped_column(String(45), nullable=True)
+    hostname: Mapped[str | None] = mapped_column(String(200), nullable=True)
+    monthly_cost_cents: Mapped[int] = mapped_column(Integer, default=0)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=lambda: datetime.now(timezone.utc)
+    )
+    terminated_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
+
+    __table_args__ = (
+        Index("ix_servers_identity", "identity_id"),
+    )
