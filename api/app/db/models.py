@@ -18,9 +18,7 @@ class FileRecord(Base):
 
     __tablename__ = "files"
 
-    id: Mapped[str] = mapped_column(
-        String(36), primary_key=True, default=lambda: str(uuid.uuid4())
-    )
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=lambda: str(uuid.uuid4()))
     identity_id: Mapped[str] = mapped_column(String(36), nullable=False, index=True)
     product: Mapped[str] = mapped_column(String(50), nullable=False, index=True)
     file_type: Mapped[str] = mapped_column(String(50), nullable=False)
@@ -47,9 +45,7 @@ class UsageRecord(Base):
 
     __tablename__ = "usage"
 
-    id: Mapped[str] = mapped_column(
-        String(36), primary_key=True, default=lambda: str(uuid.uuid4())
-    )
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=lambda: str(uuid.uuid4()))
     identity_id: Mapped[str] = mapped_column(String(36), nullable=False, index=True)
     month: Mapped[str] = mapped_column(String(7), nullable=False)  # "2026-04"
     storage_bytes: Mapped[int] = mapped_column(BigInteger, default=0)
@@ -57,9 +53,7 @@ class UsageRecord(Base):
     upload_count: Mapped[int] = mapped_column(Integer, default=0)
     download_count: Mapped[int] = mapped_column(Integer, default=0)
 
-    __table_args__ = (
-        Index("ix_usage_identity_month", "identity_id", "month", unique=True),
-    )
+    __table_args__ = (Index("ix_usage_identity_month", "identity_id", "month", unique=True),)
 
 
 class ComputeJob(Base):
@@ -67,11 +61,9 @@ class ComputeJob(Base):
 
     __tablename__ = "compute_jobs"
 
-    id: Mapped[str] = mapped_column(
-        String(36), primary_key=True, default=lambda: str(uuid.uuid4())
-    )
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=lambda: str(uuid.uuid4()))
     identity_id: Mapped[str] = mapped_column(String(36), nullable=False, index=True)
-    status: Mapped[str] = mapped_column(String(20), default="processing")  # processing/completed/failed
+    status: Mapped[str] = mapped_column(String(20), default="processing")
     model: Mapped[str] = mapped_column(String(50), default="large-v3")
     language: Mapped[str | None] = mapped_column(String(10), nullable=True)
     audio_duration_seconds: Mapped[float] = mapped_column(Float, default=0.0)
@@ -82,13 +74,9 @@ class ComputeJob(Base):
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), default=lambda: datetime.now(timezone.utc)
     )
-    completed_at: Mapped[datetime | None] = mapped_column(
-        DateTime(timezone=True), nullable=True
-    )
+    completed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
 
-    __table_args__ = (
-        Index("ix_compute_jobs_identity", "identity_id"),
-    )
+    __table_args__ = (Index("ix_compute_jobs_identity", "identity_id"),)
 
 
 class ComputeUsageRecord(Base):
@@ -96,9 +84,7 @@ class ComputeUsageRecord(Base):
 
     __tablename__ = "compute_usage"
 
-    id: Mapped[str] = mapped_column(
-        String(36), primary_key=True, default=lambda: str(uuid.uuid4())
-    )
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=lambda: str(uuid.uuid4()))
     identity_id: Mapped[str] = mapped_column(String(36), nullable=False, index=True)
     month: Mapped[str] = mapped_column(String(7), nullable=False)
     total_seconds: Mapped[float] = mapped_column(Float, default=0.0)
@@ -115,9 +101,7 @@ class ServerRecord(Base):
 
     __tablename__ = "servers"
 
-    id: Mapped[str] = mapped_column(
-        String(36), primary_key=True, default=lambda: str(uuid.uuid4())
-    )
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=lambda: str(uuid.uuid4()))
     identity_id: Mapped[str] = mapped_column(String(36), nullable=False, index=True)
     plan_id: Mapped[str] = mapped_column(String(50), nullable=False)
     region: Mapped[str] = mapped_column(String(50), nullable=False)
@@ -130,10 +114,6 @@ class ServerRecord(Base):
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), default=lambda: datetime.now(timezone.utc)
     )
-    terminated_at: Mapped[datetime | None] = mapped_column(
-        DateTime(timezone=True), nullable=True
-    )
+    terminated_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
 
-    __table_args__ = (
-        Index("ix_servers_identity", "identity_id"),
-    )
+    __table_args__ = (Index("ix_servers_identity", "identity_id"),)

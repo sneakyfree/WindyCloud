@@ -4,16 +4,15 @@ from __future__ import annotations
 
 import json
 import uuid
-from datetime import datetime, timezone
 
-from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, Form, Query, status
-from sqlalchemy import select, func
+from fastapi import APIRouter, Depends, File, Form, HTTPException, Query, UploadFile, status
+from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from api.app.auth.dependencies import AuthenticatedUser, get_current_user
+from api.app.config import settings
 from api.app.db.engine import get_db
 from api.app.db.models import FileRecord
-from api.app.config import settings
 from api.app.models.storage import (
     DeleteResponse,
     FileInfo,
@@ -29,8 +28,10 @@ def _get_provider():
     """Return the active storage provider (R2 or local disk)."""
     if settings.r2_configured:
         from api.app.providers.r2 import R2StorageProvider
+
         return R2StorageProvider()
     from api.app.providers.local_disk import LocalDiskProvider
+
     return LocalDiskProvider()
 
 
@@ -164,7 +165,7 @@ async def download_file(
     provider = _get_provider()
     try:
         data, content_type = await provider.download(record.storage_key)
-    except (FileNotFoundError, Exception) as e:
+    except (FileNotFoundError, Exception):
         raise HTTPException(status_code=404, detail="File not found in storage")
 
     from fastapi.responses import Response

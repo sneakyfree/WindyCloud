@@ -177,9 +177,7 @@ class RunPodSTTProvider:
         return {
             "provider": "runpod",
             "model": "faster-whisper large-v3",
-            "cost_per_minute_cents": round(
-                self.BASE_COST_PER_MINUTE_CENTS * self._markup, 2
-            ),
+            "cost_per_minute_cents": round(self.BASE_COST_PER_MINUTE_CENTS * self._markup, 2),
             "markup": self._markup,
             "free_minutes_per_month": settings.stt_free_minutes,
         }

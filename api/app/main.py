@@ -44,16 +44,16 @@ def create_app() -> FastAPI:
     )
 
     # Routers
+    from api.app.routes.archive import router as archive_router
     from api.app.routes.health import router as health_router
     from api.app.routes.storage import router as storage_router
-    from api.app.routes.archive import router as archive_router
 
     app.include_router(health_router)
     app.include_router(storage_router, prefix="/api/v1/storage", tags=["storage"])
     app.include_router(archive_router, prefix="/api/v1/archive", tags=["archive"])
 
-    from api.app.routes.compute import router as compute_router
     from api.app.routes.billing import router as billing_router
+    from api.app.routes.compute import router as compute_router
 
     app.include_router(compute_router, prefix="/api/v1/compute", tags=["compute"])
     app.include_router(billing_router, prefix="/api/v1/billing", tags=["billing"])

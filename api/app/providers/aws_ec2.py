@@ -6,14 +6,12 @@ Start with AWS, migrate to own hardware when volume justifies it.
 
 from __future__ import annotations
 
-import uuid
 from typing import Any
 
 import boto3
 from botocore.exceptions import ClientError
 
 from api.app.config import settings
-
 
 # Plan definitions — maps plan IDs to EC2 instance types
 PLANS = {

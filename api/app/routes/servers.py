@@ -31,12 +31,14 @@ def _get_provider():
     if not settings.aws_access_key_id:
         return None
     from api.app.providers.aws_ec2 import AWSEC2Provider
+
     return AWSEC2Provider()
 
 
 def _plans_from_provider():
     """Return plan list — works even without AWS credentials."""
     from api.app.providers.aws_ec2 import PLANS
+
     return [
         ServerPlan(plan_id=pid, **{k: v for k, v in p.items() if k != "instance_type"})
         for pid, p in PLANS.items()

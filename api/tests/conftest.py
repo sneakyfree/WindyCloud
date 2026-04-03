@@ -10,7 +10,6 @@ from api.app.auth.dependencies import AuthenticatedUser, get_current_user
 from api.app.db.engine import get_db
 from api.app.db.models import Base
 
-
 TEST_USER = AuthenticatedUser(
     identity_id="test-user-001",
     claims={"sub": "test-user-001", "windy_identity_id": "test-user-001"},

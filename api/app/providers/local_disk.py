@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import json
-import os
 import time
 import uuid
 from pathlib import Path
@@ -105,13 +104,15 @@ class LocalDiskProvider:
                 if path.is_file() and not path.name.endswith(".meta.json"):
                     rel = str(path.relative_to(self._base))
                     stat = path.stat()
-                    files.append({
-                        "key": rel,
-                        "size": stat.st_size,
-                        "last_modified": time.strftime(
-                            "%Y-%m-%dT%H:%M:%SZ", time.gmtime(stat.st_mtime)
-                        ),
-                    })
+                    files.append(
+                        {
+                            "key": rel,
+                            "size": stat.st_size,
+                            "last_modified": time.strftime(
+                                "%Y-%m-%dT%H:%M:%SZ", time.gmtime(stat.st_mtime)
+                            ),
+                        }
+                    )
 
         # Simple pagination via offset
         offset = int(continuation_token) if continuation_token else 0

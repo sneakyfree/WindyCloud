@@ -4,10 +4,9 @@ from __future__ import annotations
 
 import json
 import uuid
-from datetime import datetime, timezone
 
-from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, Form, status
-from sqlalchemy import select, delete as sa_delete
+from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile, status
+from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from api.app.auth.dependencies import AuthenticatedUser, get_current_user
@@ -31,8 +30,10 @@ ARCHIVE_TYPES = {
 def _get_provider():
     if settings.r2_configured:
         from api.app.providers.r2 import R2StorageProvider
+
         return R2StorageProvider()
     from api.app.providers.local_disk import LocalDiskProvider
+
     return LocalDiskProvider()
 
 

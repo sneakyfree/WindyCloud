@@ -36,8 +36,12 @@ class StorageProvider(Protocol):
     async def delete(self, key: str) -> bool: ...
 
     async def list_files(
-        self, identity_id: str, product: str | None = None, prefix: str | None = None,
-        max_keys: int = 100, continuation_token: str | None = None,
+        self,
+        identity_id: str,
+        product: str | None = None,
+        prefix: str | None = None,
+        max_keys: int = 100,
+        continuation_token: str | None = None,
     ) -> dict[str, Any]: ...
 
     async def usage(self, identity_id: str) -> dict[str, Any]: ...
@@ -138,11 +142,13 @@ class R2StorageProvider:
         resp = self._client.list_objects_v2(**params)
         files = []
         for obj in resp.get("Contents", []):
-            files.append({
-                "key": obj["Key"],
-                "size": obj["Size"],
-                "last_modified": obj["LastModified"].isoformat(),
-            })
+            files.append(
+                {
+                    "key": obj["Key"],
+                    "size": obj["Size"],
+                    "last_modified": obj["LastModified"].isoformat(),
+                }
+            )
         return {
             "files": files,
             "total": resp.get("KeyCount", 0),

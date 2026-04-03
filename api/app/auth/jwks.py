@@ -5,9 +5,8 @@ from __future__ import annotations
 import time
 from typing import Any
 
-import httpx
 import jwt
-from jwt import PyJWKClient, PyJWK
+from jwt import PyJWKClient
 
 
 class JWKSValidator:
@@ -50,6 +49,7 @@ def get_pro_validator() -> JWKSValidator:
     global _pro_validator
     if _pro_validator is None:
         from api.app.config import settings
+
         _pro_validator = JWKSValidator(settings.windy_pro_jwks_url)
     return _pro_validator
 
@@ -58,6 +58,7 @@ def get_eternitas_validator() -> JWKSValidator:
     global _eternitas_validator
     if _eternitas_validator is None:
         from api.app.config import settings
+
         _eternitas_validator = JWKSValidator(settings.eternitas_jwks_url)
     return _eternitas_validator
 

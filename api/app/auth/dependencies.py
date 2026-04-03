@@ -9,7 +9,6 @@ from fastapi import Depends, HTTPException, status
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 
 from api.app.auth.jwks import (
-    JWKSValidator,
     extract_identity_id,
     get_eternitas_validator,
     get_pro_validator,

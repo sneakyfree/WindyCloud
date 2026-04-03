@@ -5,8 +5,8 @@ from __future__ import annotations
 import json
 from datetime import datetime, timezone
 
-from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, Form, status
-from sqlalchemy import select, func
+from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile, status
+from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from api.app.auth.dependencies import AuthenticatedUser, get_current_user
@@ -28,6 +28,7 @@ def _get_stt_provider():
     if not settings.runpod_api_key:
         return None
     from api.app.providers.runpod import RunPodSTTProvider
+
     return RunPodSTTProvider()
 
 
@@ -127,10 +128,12 @@ async def transcribe(
     job.status = result.status
     job.audio_duration_seconds = result.duration_seconds or 0.0
     job.result_text = result.text
-    job.result_segments_json = json.dumps([s.model_dump() for s in result.segments]) if result.segments else None
+    if result.segments:
+        job.result_segments_json = json.dumps([s.model_dump() for s in result.segments])
     job.cost_cents = actual_cost
     job.error = result.error
-    job.completed_at = datetime.now(timezone.utc) if result.status in ("completed", "failed") else None
+    if result.status in ("completed", "failed"):
+        job.completed_at = datetime.now(timezone.utc)
 
     # Update usage
     if result.status == "completed" and result.duration_seconds:
@@ -161,8 +164,10 @@ async def get_stt_job(
         segments = []
         if job.result_segments_json:
             import json as _json
+
             segments_data = _json.loads(job.result_segments_json)
             from api.app.models.compute import TranscriptionSegment
+
             segments = [TranscriptionSegment(**s) for s in segments_data]
 
         stt_result = TranscriptionResult(
