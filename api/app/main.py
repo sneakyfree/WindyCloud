@@ -52,13 +52,15 @@ def create_app() -> FastAPI:
     app.include_router(storage_router, prefix="/api/v1/storage", tags=["storage"])
     app.include_router(archive_router, prefix="/api/v1/archive", tags=["archive"])
 
-    # TODO: Include these as they're built
-    # from api.app.routes.compute import router as compute_router
+    from api.app.routes.compute import router as compute_router
+    from api.app.routes.billing import router as billing_router
+
+    app.include_router(compute_router, prefix="/api/v1/compute", tags=["compute"])
+    app.include_router(billing_router, prefix="/api/v1/billing", tags=["billing"])
+
+    # TODO: Include when built
     # from api.app.routes.servers import router as servers_router
-    # from api.app.routes.billing import router as billing_router
-    # app.include_router(compute_router, prefix="/api/v1/compute", tags=["compute"])
     # app.include_router(servers_router, prefix="/api/v1/servers", tags=["servers"])
-    # app.include_router(billing_router, prefix="/api/v1/billing", tags=["billing"])
 
     return app
 

@@ -5,7 +5,7 @@ from __future__ import annotations
 import uuid
 from datetime import datetime, timezone
 
-from sqlalchemy import BigInteger, Boolean, DateTime, Index, Integer, String, Text
+from sqlalchemy import BigInteger, Boolean, DateTime, Float, Index, Integer, String, Text
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column
 
 
@@ -59,4 +59,52 @@ class UsageRecord(Base):
 
     __table_args__ = (
         Index("ix_usage_identity_month", "identity_id", "month", unique=True),
+    )
+
+
+class ComputeJob(Base):
+    """Individual STT compute job."""
+
+    __tablename__ = "compute_jobs"
+
+    id: Mapped[str] = mapped_column(
+        String(36), primary_key=True, default=lambda: str(uuid.uuid4())
+    )
+    identity_id: Mapped[str] = mapped_column(String(36), nullable=False, index=True)
+    status: Mapped[str] = mapped_column(String(20), default="processing")  # processing/completed/failed
+    model: Mapped[str] = mapped_column(String(50), default="large-v3")
+    language: Mapped[str | None] = mapped_column(String(10), nullable=True)
+    audio_duration_seconds: Mapped[float] = mapped_column(Float, default=0.0)
+    result_text: Mapped[str | None] = mapped_column(Text, nullable=True)
+    result_segments_json: Mapped[str | None] = mapped_column(Text, nullable=True)
+    cost_cents: Mapped[int] = mapped_column(Integer, default=0)
+    error: Mapped[str | None] = mapped_column(String(500), nullable=True)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=lambda: datetime.now(timezone.utc)
+    )
+    completed_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
+
+    __table_args__ = (
+        Index("ix_compute_jobs_identity", "identity_id"),
+    )
+
+
+class ComputeUsageRecord(Base):
+    """Monthly compute usage tracking per identity."""
+
+    __tablename__ = "compute_usage"
+
+    id: Mapped[str] = mapped_column(
+        String(36), primary_key=True, default=lambda: str(uuid.uuid4())
+    )
+    identity_id: Mapped[str] = mapped_column(String(36), nullable=False, index=True)
+    month: Mapped[str] = mapped_column(String(7), nullable=False)
+    total_seconds: Mapped[float] = mapped_column(Float, default=0.0)
+    total_jobs: Mapped[int] = mapped_column(Integer, default=0)
+    total_cost_cents: Mapped[int] = mapped_column(Integer, default=0)
+
+    __table_args__ = (
+        Index("ix_compute_usage_identity_month", "identity_id", "month", unique=True),
     )
