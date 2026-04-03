@@ -21,7 +21,7 @@ No prior audit files existed besides this document. Inaugural analysis written 2
 | Passed         | 54            |
 | Failed         | 0             |
 | Skipped        | 0             |
-| Warnings       | 1 (deprecation, see N1) |
+| Warnings       | 0             |
 | Runtime        | ~11.5s        |
 | Python version | 3.12.13       |
 | Framework      | pytest 9.0.2  |
@@ -96,7 +96,7 @@ No prior audit files existed besides this document. Inaugural analysis written 2
 
 | # | Severity | Finding | Status | Notes |
 |---|----------|---------|--------|-------|
-| N1 | **Low** | `HTTP_413_REQUEST_ENTITY_TOO_LARGE` deprecated | **OPEN** | FastAPI DeprecationWarning in `storage.py:66` and `archive.py:99`. Should use `HTTP_413_CONTENT_TOO_LARGE` |
+| N1 | **Low** | `HTTP_413_REQUEST_ENTITY_TOO_LARGE` deprecated | **FIXED** ✓ | Updated to `HTTP_413_CONTENT_TOO_LARGE` in both `storage.py` and `archive.py` |
 
 ---
 
@@ -170,18 +170,18 @@ All HTTP clients have proper timeouts and exception handling. No bare `requests.
 | Critical | 0     |
 | High     | 0     |
 | Medium   | 0     |
-| Low      | 1 (N1 — deprecation warning) |
-| **Total**| **1** |
+| Low      | 0     |
+| **Total**| **0** |
 
 ### Test Results
 
 ```
-54 passed | 0 failed | 0 skipped | ruff clean | 1 deprecation warning
+54 passed | 0 failed | 0 skipped | 0 warnings | ruff clean
 ```
 
 ### Ship-Readiness Score: 10/10
 
-All 29 original gap items resolved. One new low-severity finding (deprecated status code constant) — cosmetic, does not affect functionality.
+All 30 gap items (29 original + 1 new) resolved. Zero open items.
 
 The codebase has:
 - Proper exception handling with specific catches + logging throughout

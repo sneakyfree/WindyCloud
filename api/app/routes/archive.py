@@ -96,7 +96,7 @@ async def _archive_upload(
     data = await file.read()
     if len(data) > settings.max_upload_size:
         raise HTTPException(
-            status_code=status.HTTP_413_REQUEST_ENTITY_TOO_LARGE,
+            status_code=status.HTTP_413_CONTENT_TOO_LARGE,
             detail=f"File exceeds maximum size of {settings.max_upload_size} bytes",
         )
 
