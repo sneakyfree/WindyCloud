@@ -25,11 +25,15 @@ router = APIRouter()
 
 
 def _get_stt_provider():
-    if not settings.runpod_api_key:
-        return None
-    from api.app.providers.runpod import RunPodSTTProvider
+    if settings.runpod_api_key:
+        from api.app.providers.runpod import RunPodSTTProvider
 
-    return RunPodSTTProvider()
+        return RunPodSTTProvider()
+    if settings.use_mock_providers:
+        from api.app.providers.stt_base import MockSTTProvider
+
+        return MockSTTProvider()
+    return None
 
 
 def _current_month() -> str:

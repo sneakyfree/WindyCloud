@@ -6,15 +6,112 @@ import pytest
 
 
 @pytest.mark.asyncio
-async def test_stt_returns_503_when_not_configured(client):
-    """STT should return 503 when RunPod isn't configured."""
+async def test_stt_mock_transcription(client):
+    """STT should return a mock transcription when mock providers are enabled."""
     resp = await client.post(
         "/api/v1/compute/stt",
-        files={"file": ("audio.wav", b"fake-audio", "audio/wav")},
+        files={"file": ("audio.wav", b"fake-audio-data" * 100, "audio/wav")},
         headers={"Authorization": "Bearer fake"},
     )
-    assert resp.status_code == 503
-    assert "not configured" in resp.json()["detail"]
+    assert resp.status_code == 200
+    body = resp.json()
+    assert body["status"] == "completed"
+    assert body["text"] is not None
+    assert len(body["segments"]) == 2
+    assert body["duration_seconds"] > 0
+    assert body["language"] == "en"
+
+
+@pytest.mark.asyncio
+async def test_stt_with_language_param(client):
+    """STT should accept a language parameter."""
+    resp = await client.post(
+        "/api/v1/compute/stt",
+        files={"file": ("audio.wav", b"fake-audio" * 50, "audio/wav")},
+        data={"language": "es", "model": "medium"},
+        headers={"Authorization": "Bearer fake"},
+    )
+    assert resp.status_code == 200
+    body = resp.json()
+    assert body["status"] == "completed"
+    assert body["language"] == "es"
+
+
+@pytest.mark.asyncio
+async def test_stt_empty_file_rejected(client):
+    """STT should reject empty audio files."""
+    resp = await client.post(
+        "/api/v1/compute/stt",
+        files={"file": ("audio.wav", b"", "audio/wav")},
+        headers={"Authorization": "Bearer fake"},
+    )
+    assert resp.status_code == 400
+    assert "Empty" in resp.json()["detail"]
+
+
+@pytest.mark.asyncio
+async def test_stt_job_retrieval(client):
+    """After submitting STT, the job should be retrievable by ID."""
+    # Submit transcription
+    resp = await client.post(
+        "/api/v1/compute/stt",
+        files={"file": ("audio.wav", b"fake-audio-data" * 100, "audio/wav")},
+        headers={"Authorization": "Bearer fake"},
+    )
+    assert resp.status_code == 200
+    job_id = resp.json()["job_id"]
+
+    # Retrieve job
+    resp = await client.get(
+        f"/api/v1/compute/stt/{job_id}",
+        headers={"Authorization": "Bearer fake"},
+    )
+    assert resp.status_code == 200
+    body = resp.json()
+    assert body["job_id"] == job_id
+    assert body["status"] == "completed"
+    assert body["result"] is not None
+    assert body["result"]["text"] is not None
+
+
+@pytest.mark.asyncio
+async def test_stt_updates_usage(client):
+    """STT transcription should update compute usage."""
+    # Check initial usage
+    resp = await client.get(
+        "/api/v1/compute/usage",
+        headers={"Authorization": "Bearer fake"},
+    )
+    assert resp.json()["total_jobs"] == 0
+
+    # Submit transcription
+    await client.post(
+        "/api/v1/compute/stt",
+        files={"file": ("audio.wav", b"fake-audio-data" * 100, "audio/wav")},
+        headers={"Authorization": "Bearer fake"},
+    )
+
+    # Check updated usage
+    resp = await client.get(
+        "/api/v1/compute/usage",
+        headers={"Authorization": "Bearer fake"},
+    )
+    body = resp.json()
+    assert body["total_jobs"] == 1
+    assert body["total_seconds"] > 0
+
+
+@pytest.mark.asyncio
+async def test_stt_free_tier_no_cost(client):
+    """Short transcriptions within free tier should have zero cost."""
+    resp = await client.post(
+        "/api/v1/compute/stt",
+        files={"file": ("audio.wav", b"tiny", "audio/wav")},
+        headers={"Authorization": "Bearer fake"},
+    )
+    assert resp.status_code == 200
+    # Free tier covers 10 minutes, tiny file is well within
+    assert resp.json()["cost_cents"] == 0
 
 
 @pytest.mark.asyncio

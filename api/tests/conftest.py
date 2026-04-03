@@ -34,7 +34,12 @@ async def db_session():
 @pytest.fixture
 async def client(db_session: AsyncSession):
     """Test client with mocked auth and in-memory DB."""
+    from api.app.config import settings
     from api.app.main import create_app
+
+    # Enable mock providers for testing
+    original = settings.use_mock_providers
+    settings.use_mock_providers = True
 
     app = create_app()
 
@@ -50,3 +55,5 @@ async def client(db_session: AsyncSession):
     transport = ASGITransport(app=app)
     async with AsyncClient(transport=transport, base_url="http://test") as ac:
         yield ac
+
+    settings.use_mock_providers = original

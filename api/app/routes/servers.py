@@ -28,16 +28,23 @@ router = APIRouter()
 
 
 def _get_provider():
-    if not settings.aws_access_key_id:
-        return None
-    from api.app.providers.aws_ec2 import AWSEC2Provider
+    if settings.aws_access_key_id:
+        from api.app.providers.aws_ec2 import AWSEC2Provider
 
-    return AWSEC2Provider()
+        return AWSEC2Provider()
+    if settings.use_mock_providers:
+        from api.app.providers.mock_vps import MockVPSProvider
+
+        return MockVPSProvider()
+    return None
 
 
 def _plans_from_provider():
     """Return plan list — works even without AWS credentials."""
-    from api.app.providers.aws_ec2 import PLANS
+    if settings.aws_access_key_id:
+        from api.app.providers.aws_ec2 import PLANS
+    else:
+        from api.app.providers.mock_vps import MOCK_PLANS as PLANS
 
     return [
         ServerPlan(plan_id=pid, **{k: v for k, v in p.items() if k != "instance_type"})
