@@ -41,6 +41,7 @@ class Settings(BaseSettings):
     # Quotas
     default_storage_quota: int = 524_288_000  # 500MB
     max_upload_size: int = 1_073_741_824  # 1GB
+    max_servers_per_user: int = 5
 
     # Mock providers (for testing/dev without real cloud credentials)
     use_mock_providers: bool = False

@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import asyncio
 import json
 import logging
 import re
@@ -28,6 +29,9 @@ from api.app.models.storage import (
 
 logger = logging.getLogger(__name__)
 router = APIRouter()
+
+# Limit concurrent uploads to prevent memory exhaustion (files can be up to 1 GB)
+_upload_semaphore = asyncio.Semaphore(5)
 
 
 def _sanitize_filename(name: str) -> str:
@@ -60,6 +64,18 @@ async def upload_file(
     user: AuthenticatedUser = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
+    async with _upload_semaphore:
+        return await _do_upload(file, product, file_type, metadata, user, db)
+
+
+async def _do_upload(
+    file: UploadFile,
+    product: str,
+    file_type: str,
+    metadata: str,
+    user: AuthenticatedUser,
+    db: AsyncSession,
+) -> UploadResponse:
     data = await file.read()
     if len(data) > settings.max_upload_size:
         raise HTTPException(
@@ -190,11 +206,15 @@ async def download_file(
         logger.exception("Storage download failed for key %s", record.storage_key)
         raise HTTPException(status_code=502, detail="Storage backend error")
 
+    # Sanitize filename for Content-Disposition header (prevent header injection)
+    safe_name = (
+        record.filename.replace("\\", "_").replace('"', "_").replace("\n", "_").replace("\r", "_")
+    )
     return Response(
         content=data,
         media_type=content_type,
         headers={
-            "Content-Disposition": f'attachment; filename="{record.filename}"',
+            "Content-Disposition": f'attachment; filename="{safe_name}"',
         },
     )
 

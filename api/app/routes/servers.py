@@ -5,7 +5,7 @@ from __future__ import annotations
 from datetime import datetime, timezone
 
 from fastapi import APIRouter, Depends, HTTPException, status
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from api.app.auth.dependencies import AuthenticatedUser, get_current_user
@@ -68,6 +68,20 @@ async def create_server(
         raise HTTPException(
             status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
             detail="VPS provisioning is not configured. Set AWS credentials.",
+        )
+
+    # Enforce per-user server limit
+    count_result = await db.execute(
+        select(func.count(ServerRecord.id)).where(
+            ServerRecord.identity_id == user.identity_id,
+            ServerRecord.status != "terminated",
+        )
+    )
+    active_count = count_result.scalar() or 0
+    if active_count >= settings.max_servers_per_user:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail=f"Maximum of {settings.max_servers_per_user} active servers per user",
         )
 
     # Validate plan

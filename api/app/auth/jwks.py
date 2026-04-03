@@ -21,7 +21,7 @@ class JWKSValidator:
     def _get_client(self) -> PyJWKClient:
         now = time.monotonic()
         if self._jwk_client is None or (now - self._last_fetch) > self._cache_ttl:
-            self._jwk_client = PyJWKClient(self.jwks_url, cache_keys=True)
+            self._jwk_client = PyJWKClient(self.jwks_url, cache_keys=True, timeout=5)
             self._last_fetch = now
         return self._jwk_client
 

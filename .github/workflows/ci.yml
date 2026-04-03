@@ -39,7 +39,7 @@ jobs:
 
       - name: Start container and verify health
         run: |
-          docker run -d --name cloud-ci -p 8200:8200 windy-cloud:ci
+          docker run -d --name cloud-ci -p 8200:8200 -e USE_MOCK_PROVIDERS=true windy-cloud:ci
           sleep 3
           STATUS=$(curl -sf http://localhost:8200/health | python3 -c "import sys,json; print(json.load(sys.stdin)['status'])")
           echo "Health status: $STATUS"

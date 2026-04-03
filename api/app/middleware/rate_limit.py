@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import hashlib
 import logging
 import time
 from collections import defaultdict
@@ -50,9 +51,9 @@ class RateLimitMiddleware(BaseHTTPMiddleware):
         if not auth.startswith("Bearer "):
             return await call_next(request)
 
-        # Use the full token as rate limit key (ties to identity)
+        # Hash the token to save memory (full JWTs are ~800 bytes)
         token = auth[7:]
-        key = token
+        key = hashlib.sha256(token.encode()).hexdigest()[:16]
 
         now = time.monotonic()
         self._clean_window(key, now)

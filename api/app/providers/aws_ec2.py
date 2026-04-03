@@ -6,6 +6,7 @@ Start with AWS, migrate to own hardware when volume justifies it.
 
 from __future__ import annotations
 
+import asyncio
 from typing import Any
 
 import boto3
@@ -108,7 +109,8 @@ class AWSEC2Provider:
         instance_type = plan_config["instance_type"]
 
         try:
-            resp = self._ec2.run_instances(
+            resp = await asyncio.to_thread(
+                self._ec2.run_instances,
                 ImageId=ami_id,
                 InstanceType=instance_type,
                 MinCount=1,
@@ -136,7 +138,9 @@ class AWSEC2Provider:
 
     async def get(self, provider_instance_id: str) -> dict[str, Any]:
         try:
-            resp = self._ec2.describe_instances(InstanceIds=[provider_instance_id])
+            resp = await asyncio.to_thread(
+                self._ec2.describe_instances, InstanceIds=[provider_instance_id]
+            )
             instance = resp["Reservations"][0]["Instances"][0]
             ec2_state = instance["State"]["Name"]
             status_map = {
@@ -157,13 +161,19 @@ class AWSEC2Provider:
     async def action(self, provider_instance_id: str, action: str) -> dict[str, str]:
         try:
             if action == "start":
-                self._ec2.start_instances(InstanceIds=[provider_instance_id])
+                await asyncio.to_thread(
+                    self._ec2.start_instances, InstanceIds=[provider_instance_id]
+                )
                 return {"status": "starting", "message": "Server starting"}
             elif action == "stop":
-                self._ec2.stop_instances(InstanceIds=[provider_instance_id])
+                await asyncio.to_thread(
+                    self._ec2.stop_instances, InstanceIds=[provider_instance_id]
+                )
                 return {"status": "stopping", "message": "Server stopping"}
             elif action == "reboot":
-                self._ec2.reboot_instances(InstanceIds=[provider_instance_id])
+                await asyncio.to_thread(
+                    self._ec2.reboot_instances, InstanceIds=[provider_instance_id]
+                )
                 return {"status": "rebooting", "message": "Server rebooting"}
             else:
                 raise ValueError(f"Unknown action: {action}")
@@ -172,7 +182,9 @@ class AWSEC2Provider:
 
     async def delete(self, provider_instance_id: str) -> bool:
         try:
-            self._ec2.terminate_instances(InstanceIds=[provider_instance_id])
+            await asyncio.to_thread(
+                self._ec2.terminate_instances, InstanceIds=[provider_instance_id]
+            )
             return True
         except ClientError:
             return False
@@ -187,7 +199,7 @@ class AWSEC2Provider:
         if not settings.aws_access_key_id:
             return False
         try:
-            self._ec2.describe_regions(RegionNames=[settings.aws_region])
+            await asyncio.to_thread(self._ec2.describe_regions, RegionNames=[settings.aws_region])
             return True
         except ClientError:
             return False

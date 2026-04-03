@@ -5,9 +5,11 @@ on:
     branches: [main]
     paths:
       - 'api/**'
+      - 'deploy/**'
       - 'Dockerfile'
       - 'pyproject.toml'
       - 'docker-compose.yml'
+      - '.github/workflows/deploy.yml'
 
 jobs:
   build-and-deploy:

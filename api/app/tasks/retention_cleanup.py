@@ -24,6 +24,18 @@ async def enforce_retention_days(db: AsyncSession) -> int:
     result = await db.execute(select(FileRecord).where(FileRecord.retention_days.isnot(None)))
     records = result.scalars().all()
 
+    # Create provider once outside the loop
+    from api.app.config import settings
+
+    if settings.r2_configured:
+        from api.app.providers.r2 import R2StorageProvider
+
+        provider = R2StorageProvider()
+    else:
+        from api.app.providers.local_disk import LocalDiskProvider
+
+        provider = LocalDiskProvider()
+
     deleted = 0
     for record in records:
         if not record.retention_days or record.retention_days <= 0:
@@ -36,18 +48,7 @@ async def enforce_retention_days(db: AsyncSession) -> int:
                 record.created_at,
                 record.retention_days,
             )
-            # Delete from storage provider
             try:
-                from api.app.config import settings
-
-                if settings.r2_configured:
-                    from api.app.providers.r2 import R2StorageProvider
-
-                    provider = R2StorageProvider()
-                else:
-                    from api.app.providers.local_disk import LocalDiskProvider
-
-                    provider = LocalDiskProvider()
                 await provider.delete(record.storage_key)
             except Exception:
                 logger.exception("Failed to delete storage for %s", record.storage_key)

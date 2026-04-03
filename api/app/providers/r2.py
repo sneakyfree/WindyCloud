@@ -6,6 +6,7 @@ Same bucket structure, same metadata tags.
 
 from __future__ import annotations
 
+import asyncio
 import time
 import uuid
 from typing import Any, Protocol
@@ -15,6 +16,17 @@ from botocore.config import Config as BotoConfig
 from botocore.exceptions import ClientError
 
 from api.app.config import settings
+
+# Internal tag keys that user metadata must not overwrite
+_RESERVED_TAG_KEYS = frozenset(
+    {
+        "windy-user-id",
+        "windy-file-type",
+        "windy-upload-time",
+        "windy-product",
+        "windy-file-id",
+    }
+)
 
 
 class StorageProvider(Protocol):
@@ -88,9 +100,11 @@ class R2StorageProvider:
             "windy-file-id": file_id,
         }
         if metadata:
-            tags.update(metadata)
+            # Filter out reserved internal tags to prevent user overwrite
+            tags.update({k: v for k, v in metadata.items() if k not in _RESERVED_TAG_KEYS})
 
-        self._client.put_object(
+        await asyncio.to_thread(
+            self._client.put_object,
             Bucket=self._bucket,
             Key=key,
             Body=data,
@@ -105,14 +119,14 @@ class R2StorageProvider:
         }
 
     async def download(self, key: str) -> tuple[bytes, str]:
-        resp = self._client.get_object(Bucket=self._bucket, Key=key)
+        resp = await asyncio.to_thread(self._client.get_object, Bucket=self._bucket, Key=key)
         data = resp["Body"].read()
         content_type = resp.get("ContentType", "application/octet-stream")
         return data, content_type
 
     async def delete(self, key: str) -> bool:
         try:
-            self._client.delete_object(Bucket=self._bucket, Key=key)
+            await asyncio.to_thread(self._client.delete_object, Bucket=self._bucket, Key=key)
             return True
         except ClientError:
             return False
@@ -139,7 +153,7 @@ class R2StorageProvider:
         if continuation_token:
             params["ContinuationToken"] = continuation_token
 
-        resp = self._client.list_objects_v2(**params)
+        resp = await asyncio.to_thread(self._client.list_objects_v2, **params)
         files = []
         for obj in resp.get("Contents", []):
             files.append(
@@ -176,7 +190,7 @@ class R2StorageProvider:
 
     async def health(self) -> bool:
         try:
-            self._client.head_bucket(Bucket=self._bucket)
+            await asyncio.to_thread(self._client.head_bucket, Bucket=self._bucket)
             return True
         except ClientError:
             return False

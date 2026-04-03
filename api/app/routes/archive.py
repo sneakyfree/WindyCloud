@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import asyncio
 import json
 import logging
 import re
@@ -19,6 +20,9 @@ from api.app.models.storage import ArchiveResponse
 
 logger = logging.getLogger(__name__)
 router = APIRouter()
+
+# Shared upload concurrency limit with storage routes
+_upload_semaphore = asyncio.Semaphore(5)
 
 
 def _sanitize_filename(name: str) -> str:
@@ -89,6 +93,17 @@ async def _archive_upload(
     db: AsyncSession,
 ) -> ArchiveResponse:
     """Shared logic for all archive endpoints."""
+    async with _upload_semaphore:
+        return await _do_archive_upload(archive_key, file, metadata, user, db)
+
+
+async def _do_archive_upload(
+    archive_key: str,
+    file: UploadFile,
+    metadata: str,
+    user: AuthenticatedUser,
+    db: AsyncSession,
+) -> ArchiveResponse:
     config = ARCHIVE_TYPES[archive_key]
     product = config["product"]
     file_type = config["type"]

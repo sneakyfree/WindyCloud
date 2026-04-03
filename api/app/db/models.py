@@ -40,22 +40,6 @@ class FileRecord(Base):
     )
 
 
-class UsageRecord(Base):
-    """Monthly usage tracking per identity."""
-
-    __tablename__ = "usage"
-
-    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=lambda: str(uuid.uuid4()))
-    identity_id: Mapped[str] = mapped_column(String(36), nullable=False, index=True)
-    month: Mapped[str] = mapped_column(String(7), nullable=False)  # "2026-04"
-    storage_bytes: Mapped[int] = mapped_column(BigInteger, default=0)
-    file_count: Mapped[int] = mapped_column(Integer, default=0)
-    upload_count: Mapped[int] = mapped_column(Integer, default=0)
-    download_count: Mapped[int] = mapped_column(Integer, default=0)
-
-    __table_args__ = (Index("ix_usage_identity_month", "identity_id", "month", unique=True),)
-
-
 class ComputeJob(Base):
     """Individual STT compute job."""
 
