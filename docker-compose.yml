@@ -6,8 +6,7 @@ services:
     env_file:
       - .env
     volumes:
-      - cloud-data:/app/data
-      - ./api:/app/api  # Dev hot-reload
+      - cloud-data:/app/data  # SQLite DB + local file storage persist here
     restart: unless-stopped
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8200/health"]
@@ -16,5 +15,9 @@ services:
       retries: 3
       start_period: 10s
 
+  # Dev: docker compose -f docker-compose.yml -f docker-compose.dev.yml up
+  # adds ./api:/app/api for hot-reload
+
 volumes:
   cloud-data:
+    driver: local

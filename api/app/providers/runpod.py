@@ -170,7 +170,12 @@ class RunPodSTTProvider:
                     headers=self._headers,
                 )
                 return resp.status_code == 200
+        except httpx.HTTPError:
+            return False
         except Exception:
+            import logging
+
+            logging.getLogger(__name__).exception("Unexpected RunPod health check error")
             return False
 
     def pricing(self) -> dict:

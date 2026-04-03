@@ -96,6 +96,27 @@ class ComputeUsageRecord(Base):
     )
 
 
+class BillingSnapshot(Base):
+    """Daily billing snapshot per identity — tracks storage and compute usage over time."""
+
+    __tablename__ = "billing_snapshots"
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=lambda: str(uuid.uuid4()))
+    identity_id: Mapped[str] = mapped_column(String(36), nullable=False, index=True)
+    date: Mapped[str] = mapped_column(String(10), nullable=False)  # "2026-04-03"
+    storage_bytes: Mapped[int] = mapped_column(BigInteger, default=0)
+    file_count: Mapped[int] = mapped_column(Integer, default=0)
+    compute_seconds: Mapped[float] = mapped_column(Float, default=0.0)
+    compute_cost_cents: Mapped[int] = mapped_column(Integer, default=0)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=lambda: datetime.now(timezone.utc)
+    )
+
+    __table_args__ = (
+        Index("ix_billing_snapshots_identity_date", "identity_id", "date", unique=True),
+    )
+
+
 class ServerRecord(Base):
     """VPS server instance metadata."""
 

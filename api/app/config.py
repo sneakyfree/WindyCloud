@@ -35,7 +35,8 @@ class Settings(BaseSettings):
     host: str = "0.0.0.0"
     port: int = 8200
     log_level: str = "info"
-    cors_origins: str = "https://windypro.thewindstorm.uk,http://localhost:3000"
+    dev_mode: bool = False
+    cors_origins: str = "https://windypro.thewindstorm.uk"
 
     # Quotas
     default_storage_quota: int = 524_288_000  # 500MB
@@ -46,7 +47,11 @@ class Settings(BaseSettings):
 
     @property
     def cors_origins_list(self) -> list[str]:
-        return [o.strip() for o in self.cors_origins.split(",") if o.strip()]
+        origins = [o.strip() for o in self.cors_origins.split(",") if o.strip()]
+        if self.dev_mode:
+            origins.append("http://localhost:3000")
+            origins.append("http://localhost:8200")
+        return origins
 
     @property
     def r2_configured(self) -> bool:

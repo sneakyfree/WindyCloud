@@ -11,7 +11,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from api.app.auth.dependencies import AuthenticatedUser, get_current_user
 from api.app.config import settings
 from api.app.db.engine import get_db
-from api.app.db.models import ComputeUsageRecord, FileRecord
+from api.app.db.models import BillingSnapshot, ComputeUsageRecord, FileRecord
 from api.app.models.billing import (
     BillingEstimateResponse,
     BillingHistoryEntry,
@@ -68,7 +68,7 @@ async def billing_usage(
             total_jobs=compute_record.total_jobs if compute_record else 0,
             total_cost_cents=compute_cost,
         ),
-        total_cost_cents=compute_cost,  # Storage is plan-based, not metered here
+        total_cost_cents=compute_cost,
     )
 
 
@@ -78,24 +78,54 @@ async def billing_history(
     user: AuthenticatedUser = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
+    # Try billing snapshots first
     result = await db.execute(
-        select(ComputeUsageRecord)
-        .where(ComputeUsageRecord.identity_id == user.identity_id)
-        .order_by(ComputeUsageRecord.month.desc())
-        .limit(months)
+        select(BillingSnapshot)
+        .where(BillingSnapshot.identity_id == user.identity_id)
+        .order_by(BillingSnapshot.date.desc())
+        .limit(months * 31)
     )
-    records = result.scalars().all()
+    snapshots = result.scalars().all()
 
-    entries = [
-        BillingHistoryEntry(
-            month=r.month,
-            storage_bytes=0,  # Historical storage snapshots not tracked yet
-            compute_seconds=r.total_seconds,
-            compute_cost_cents=r.total_cost_cents,
-            total_cost_cents=r.total_cost_cents,
+    if snapshots:
+        # Group snapshots by month, take the latest per month
+        by_month: dict[str, BillingSnapshot] = {}
+        for s in snapshots:
+            month_key = s.date[:7]  # "2026-04"
+            if month_key not in by_month:
+                by_month[month_key] = s
+
+        entries = [
+            BillingHistoryEntry(
+                month=month,
+                storage_bytes=snap.storage_bytes,
+                compute_seconds=snap.compute_seconds,
+                compute_cost_cents=snap.compute_cost_cents,
+                total_cost_cents=(
+                    snap.compute_cost_cents + _estimate_storage_cost(snap.storage_bytes)
+                ),
+            )
+            for month, snap in sorted(by_month.items(), reverse=True)[:months]
+        ]
+    else:
+        # Fallback to compute_usage records
+        cu_result = await db.execute(
+            select(ComputeUsageRecord)
+            .where(ComputeUsageRecord.identity_id == user.identity_id)
+            .order_by(ComputeUsageRecord.month.desc())
+            .limit(months)
         )
-        for r in records
-    ]
+        records = cu_result.scalars().all()
+        entries = [
+            BillingHistoryEntry(
+                month=r.month,
+                storage_bytes=0,
+                compute_seconds=r.total_seconds,
+                compute_cost_cents=r.total_cost_cents,
+                total_cost_cents=r.total_cost_cents,
+            )
+            for r in records
+        ]
 
     return BillingHistoryResponse(entries=entries)
 
@@ -117,7 +147,7 @@ async def billing_estimate(
     compute_record = compute_result.scalar_one_or_none()
     compute_cost = compute_record.total_cost_cents if compute_record else 0
 
-    # Storage cost estimate (based on tier — 500MB free, then $2/5GB, $5/50GB, $10/200GB)
+    # Storage cost estimate
     storage_result = await db.execute(
         select(func.coalesce(func.sum(FileRecord.size_bytes), 0)).where(
             FileRecord.identity_id == user.identity_id

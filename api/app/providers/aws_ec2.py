@@ -189,5 +189,10 @@ class AWSEC2Provider:
         try:
             self._ec2.describe_regions(RegionNames=[settings.aws_region])
             return True
+        except ClientError:
+            return False
         except Exception:
+            import logging
+
+            logging.getLogger(__name__).exception("Unexpected EC2 health check error")
             return False

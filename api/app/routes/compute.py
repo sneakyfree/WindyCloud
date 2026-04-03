@@ -19,6 +19,7 @@ from api.app.models.compute import (
     ModelsResponse,
     STTJobStatus,
     TranscriptionResult,
+    TranscriptionSegment,
 )
 
 router = APIRouter()
@@ -167,11 +168,7 @@ async def get_stt_job(
     if job.status == "completed":
         segments = []
         if job.result_segments_json:
-            import json as _json
-
-            segments_data = _json.loads(job.result_segments_json)
-            from api.app.models.compute import TranscriptionSegment
-
+            segments_data = json.loads(job.result_segments_json)
             segments = [TranscriptionSegment(**s) for s in segments_data]
 
         stt_result = TranscriptionResult(

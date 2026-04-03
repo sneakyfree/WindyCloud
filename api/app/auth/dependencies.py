@@ -2,9 +2,11 @@
 
 from __future__ import annotations
 
+import logging
 from dataclasses import dataclass
 from typing import Any
 
+import jwt as pyjwt
 from fastapi import Depends, HTTPException, status
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 
@@ -14,6 +16,7 @@ from api.app.auth.jwks import (
     get_pro_validator,
 )
 
+logger = logging.getLogger(__name__)
 bearer_scheme = HTTPBearer()
 
 
@@ -34,6 +37,7 @@ async def get_current_user(
     Returns an AuthenticatedUser with the resolved windy_identity_id.
     """
     token = credentials.credentials
+    last_error: Exception | None = None
 
     # Try Windy Pro first (most common)
     for source, get_validator in [
@@ -49,8 +53,16 @@ async def get_current_user(
                 claims=claims,
                 source=source,
             )
-        except Exception:
+        except (pyjwt.InvalidTokenError, pyjwt.PyJWKClientError, KeyError) as e:
+            last_error = e
             continue
+        except Exception:
+            logger.exception("Unexpected error validating token via %s", source)
+            last_error = None
+            continue
+
+    if last_error:
+        logger.debug("All token validators failed: %s", last_error)
 
     raise HTTPException(
         status_code=status.HTTP_401_UNAUTHORIZED,

@@ -5,6 +5,8 @@ Storage, compute, and servers. One cloud for all Windy products.
 
 from __future__ import annotations
 
+import asyncio
+import logging
 from contextlib import asynccontextmanager
 from pathlib import Path
 
@@ -13,9 +15,30 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import HTMLResponse
 from fastapi.staticfiles import StaticFiles
 
+from api.app.__version__ import __version__
 from api.app.config import settings
 
+logger = logging.getLogger(__name__)
 STATIC_DIR = Path(__file__).parent / "static"
+
+
+async def _run_startup_tasks() -> None:
+    """Run retention cleanup and billing snapshots on startup."""
+    from api.app.db.engine import async_session
+    from api.app.tasks.billing_snapshot import take_billing_snapshots
+    from api.app.tasks.retention_cleanup import enforce_retention_days
+
+    try:
+        async with async_session() as db:
+            await enforce_retention_days(db)
+    except Exception:
+        logger.exception("Retention cleanup failed on startup")
+
+    try:
+        async with async_session() as db:
+            await take_billing_snapshots(db)
+    except Exception:
+        logger.exception("Billing snapshot failed on startup")
 
 
 @asynccontextmanager
@@ -24,6 +47,10 @@ async def lifespan(app: FastAPI):
     from api.app.db.engine import init_db
 
     await init_db()
+
+    # Run background tasks after DB is ready
+    asyncio.create_task(_run_startup_tasks())
+
     yield
 
 
@@ -31,9 +58,14 @@ def create_app() -> FastAPI:
     app = FastAPI(
         title="Windy Cloud",
         description="Unified cloud platform — storage, compute, and servers.",
-        version="0.1.0",
+        version=__version__,
         lifespan=lifespan,
     )
+
+    # Request logging
+    from api.app.middleware.request_logging import RequestLoggingMiddleware
+
+    app.add_middleware(RequestLoggingMiddleware)
 
     # Rate limiting
     from api.app.middleware.rate_limit import RateLimitMiddleware
@@ -50,21 +82,17 @@ def create_app() -> FastAPI:
 
     # Routers
     from api.app.routes.archive import router as archive_router
+    from api.app.routes.billing import router as billing_router
+    from api.app.routes.compute import router as compute_router
     from api.app.routes.health import router as health_router
+    from api.app.routes.servers import router as servers_router
     from api.app.routes.storage import router as storage_router
 
     app.include_router(health_router)
     app.include_router(storage_router, prefix="/api/v1/storage", tags=["storage"])
     app.include_router(archive_router, prefix="/api/v1/archive", tags=["archive"])
-
-    from api.app.routes.billing import router as billing_router
-    from api.app.routes.compute import router as compute_router
-
     app.include_router(compute_router, prefix="/api/v1/compute", tags=["compute"])
     app.include_router(billing_router, prefix="/api/v1/billing", tags=["billing"])
-
-    from api.app.routes.servers import router as servers_router
-
     app.include_router(servers_router, prefix="/api/v1/servers", tags=["servers"])
 
     # Static files (PWA manifest, landing page, service worker)

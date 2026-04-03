@@ -3,6 +3,8 @@
 from __future__ import annotations
 
 import json
+import logging
+import re
 import uuid
 
 from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile, status
@@ -15,7 +17,18 @@ from api.app.db.engine import get_db
 from api.app.db.models import FileRecord
 from api.app.models.storage import ArchiveResponse
 
+logger = logging.getLogger(__name__)
 router = APIRouter()
+
+
+def _sanitize_filename(name: str) -> str:
+    """Strip path traversal characters and normalize filename."""
+    name = name.replace("\\", "/")
+    name = name.split("/")[-1]
+    name = re.sub(r"\.{2,}", ".", name)
+    name = name.strip(". ")
+    return name or str(uuid.uuid4())
+
 
 # Valid product/type combinations
 ARCHIVE_TYPES = {
@@ -87,12 +100,15 @@ async def _archive_upload(
             detail=f"File exceeds maximum size of {settings.max_upload_size} bytes",
         )
 
-    extra = json.loads(metadata) if metadata else {}
+    try:
+        extra = json.loads(metadata) if metadata else {}
+    except json.JSONDecodeError:
+        raise HTTPException(status_code=400, detail="Invalid JSON in metadata field")
     encrypted = extra.get("encrypted", False)
     retention_count = extra.get("retention_count")
     retention_days = extra.get("retention_days")
 
-    filename = file.filename or f"{file_type}_{uuid.uuid4()}"
+    filename = _sanitize_filename(file.filename or f"{file_type}_{uuid.uuid4()}")
     content_type = file.content_type or "application/octet-stream"
 
     provider = _get_provider()

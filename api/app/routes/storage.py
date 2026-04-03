@@ -3,9 +3,12 @@
 from __future__ import annotations
 
 import json
+import logging
+import re
 import uuid
 
 from fastapi import APIRouter, Depends, File, Form, HTTPException, Query, UploadFile, status
+from fastapi.responses import Response
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -23,7 +26,18 @@ from api.app.models.storage import (
     UsageResponse,
 )
 
+logger = logging.getLogger(__name__)
 router = APIRouter()
+
+
+def _sanitize_filename(name: str) -> str:
+    """Strip path traversal characters and normalize filename."""
+    # Remove path separators and traversal
+    name = name.replace("\\", "/")
+    name = name.split("/")[-1]  # Take only the basename
+    name = re.sub(r"\.{2,}", ".", name)  # Collapse consecutive dots
+    name = name.strip(". ")
+    return name or str(uuid.uuid4())
 
 
 def _get_provider():
@@ -66,9 +80,12 @@ async def upload_file(
             detail="Storage quota exceeded",
         )
 
-    filename = file.filename or f"{uuid.uuid4()}"
+    filename = _sanitize_filename(file.filename or f"{uuid.uuid4()}")
     content_type = file.content_type or "application/octet-stream"
-    extra_meta = json.loads(metadata) if metadata else {}
+    try:
+        extra_meta = json.loads(metadata) if metadata else {}
+    except json.JSONDecodeError:
+        raise HTTPException(status_code=400, detail="Invalid JSON in metadata field")
 
     provider = _get_provider()
     result = await provider.upload(
@@ -167,10 +184,11 @@ async def download_file(
     provider = _get_provider()
     try:
         data, content_type = await provider.download(record.storage_key)
-    except (FileNotFoundError, Exception):
+    except FileNotFoundError:
         raise HTTPException(status_code=404, detail="File not found in storage")
-
-    from fastapi.responses import Response
+    except Exception:
+        logger.exception("Storage download failed for key %s", record.storage_key)
+        raise HTTPException(status_code=502, detail="Storage backend error")
 
     return Response(
         content=data,
