@@ -74,3 +74,19 @@ class ArchiveResponse(BaseModel):
     type: str
     size: int
     message: str = "Archive stored successfully"
+
+
+# --- Plans ---
+
+
+class StoragePlan(BaseModel):
+    plan_id: str
+    name: str
+    storage_bytes: int
+    storage_display: str
+    price_cents_per_month: int
+    price_display: str
+
+
+class StoragePlansResponse(BaseModel):
+    plans: list[StoragePlan]

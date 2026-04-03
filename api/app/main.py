@@ -6,11 +6,16 @@ Storage, compute, and servers. One cloud for all Windy products.
 from __future__ import annotations
 
 from contextlib import asynccontextmanager
+from pathlib import Path
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import HTMLResponse
+from fastapi.staticfiles import StaticFiles
 
 from api.app.config import settings
+
+STATIC_DIR = Path(__file__).parent / "static"
 
 
 @asynccontextmanager
@@ -61,6 +66,13 @@ def create_app() -> FastAPI:
     from api.app.routes.servers import router as servers_router
 
     app.include_router(servers_router, prefix="/api/v1/servers", tags=["servers"])
+
+    # Static files (PWA manifest, landing page, service worker)
+    app.mount("/static", StaticFiles(directory=str(STATIC_DIR)), name="static")
+
+    @app.get("/", response_class=HTMLResponse, include_in_schema=False)
+    async def landing():
+        return (STATIC_DIR / "index.html").read_text()
 
     return app
 

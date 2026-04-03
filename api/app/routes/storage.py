@@ -17,6 +17,8 @@ from api.app.models.storage import (
     DeleteResponse,
     FileInfo,
     FileListResponse,
+    StoragePlan,
+    StoragePlansResponse,
     UploadResponse,
     UsageResponse,
 )
@@ -224,6 +226,48 @@ async def get_usage(
         quota_bytes=quota,
         used_percent=round((used_bytes / quota) * 100, 2) if quota > 0 else 0,
     )
+
+
+STORAGE_PLANS = [
+    StoragePlan(
+        plan_id="free",
+        name="Free",
+        storage_bytes=524_288_000,
+        storage_display="500 MB",
+        price_cents_per_month=0,
+        price_display="Free",
+    ),
+    StoragePlan(
+        plan_id="basic",
+        name="Basic",
+        storage_bytes=5_368_709_120,
+        storage_display="5 GB",
+        price_cents_per_month=200,
+        price_display="$2/mo",
+    ),
+    StoragePlan(
+        plan_id="pro",
+        name="Pro",
+        storage_bytes=53_687_091_200,
+        storage_display="50 GB",
+        price_cents_per_month=500,
+        price_display="$5/mo",
+    ),
+    StoragePlan(
+        plan_id="ultra",
+        name="Ultra",
+        storage_bytes=214_748_364_800,
+        storage_display="200 GB",
+        price_cents_per_month=1000,
+        price_display="$10/mo",
+    ),
+]
+
+
+@router.get("/plans", response_model=StoragePlansResponse)
+async def storage_plans():
+    """Public endpoint — no auth required. Returns storage tier pricing."""
+    return StoragePlansResponse(plans=STORAGE_PLANS)
 
 
 @router.get("/health")

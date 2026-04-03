@@ -146,3 +146,28 @@ async def test_storage_health(client):
     assert resp.status_code == 200
     assert resp.json()["status"] == "ok"
     assert resp.json()["provider"] == "LocalDiskProvider"
+
+
+@pytest.mark.asyncio
+async def test_storage_plans_no_auth(client):
+    """Plans endpoint should be public (no auth required)."""
+    resp = await client.get("/api/v1/storage/plans")
+    assert resp.status_code == 200
+    plans = resp.json()["plans"]
+    assert len(plans) == 4
+    assert plans[0]["plan_id"] == "free"
+    assert plans[0]["price_cents_per_month"] == 0
+    assert plans[1]["plan_id"] == "basic"
+    assert plans[1]["price_display"] == "$2/mo"
+    assert plans[2]["plan_id"] == "pro"
+    assert plans[3]["plan_id"] == "ultra"
+    assert plans[3]["storage_display"] == "200 GB"
+
+
+@pytest.mark.asyncio
+async def test_landing_page(client):
+    """Landing page should serve HTML with Windy Cloud title."""
+    resp = await client.get("/")
+    assert resp.status_code == 200
+    assert "Windy Cloud" in resp.text
+    assert "manifest.json" in resp.text

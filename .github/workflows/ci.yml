@@ -19,9 +19,29 @@ jobs:
 
   test:
     runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        python-version: ["3.11", "3.12"]
     steps:
       - uses: actions/checkout@v4
       - uses: astral-sh/setup-uv@v4
-      - run: uv venv .venv
+      - run: uv venv .venv --python ${{ matrix.python-version }}
       - run: uv pip install -e ".[dev]"
       - run: .venv/bin/python -m pytest api/tests/ -v --tb=short
+
+  docker:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Build Docker image
+        run: docker build -t windy-cloud:ci .
+
+      - name: Start container and verify health
+        run: |
+          docker run -d --name cloud-ci -p 8200:8200 windy-cloud:ci
+          sleep 3
+          STATUS=$(curl -sf http://localhost:8200/health | python3 -c "import sys,json; print(json.load(sys.stdin)['status'])")
+          echo "Health status: $STATUS"
+          [ "$STATUS" = "ok" ] || exit 1
+          docker stop cloud-ci

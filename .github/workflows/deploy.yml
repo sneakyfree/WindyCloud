@@ -7,9 +7,10 @@ on:
       - 'api/**'
       - 'Dockerfile'
       - 'pyproject.toml'
+      - 'docker-compose.yml'
 
 jobs:
-  build-and-push:
+  build-and-deploy:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -35,19 +36,15 @@ jobs:
           cache-from: type=gha
           cache-to: type=gha,mode=max
 
-  deploy:
-    needs: build-and-push
-    runs-on: ubuntu-latest
-    if: github.ref == 'refs/heads/main'
-    steps:
       - name: Deploy to VPS
         uses: appleboy/ssh-action@v1
         with:
-          host: ${{ secrets.VPS_HOST }}
-          username: ${{ secrets.VPS_USER }}
-          key: ${{ secrets.VPS_SSH_KEY }}
+          host: 72.60.118.54
+          username: root
+          key: ${{ secrets.DEPLOY_SSH_KEY }}
           script: |
             cd /opt/windy-cloud
             docker compose pull
             docker compose up -d
             docker image prune -f
+            echo "Deployed $(docker inspect --format='{{.Image}}' windy-cloud-cloud-1 | cut -c8-19)"
