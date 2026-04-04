@@ -49,10 +49,10 @@ export default function Login() {
           <p className="text-xs text-[var(--text-muted)] text-center">
             Get your JWT from{" "}
             <a
-              href="https://windypro.thewindstorm.uk"
+              href="https://windyword.ai"
               className="text-[var(--accent)]"
             >
-              windypro.thewindstorm.uk
+              windyword.ai
             </a>
           </p>
         </div>

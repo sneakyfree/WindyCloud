@@ -132,7 +132,7 @@ echo "  Requesting SSL certificate for $DOMAIN..."
 certbot certonly \
     --nginx \
     -d "$DOMAIN" \
-    --email admin@thewindstorm.uk \
+    --email admin@windycloud.com \
     --agree-tos \
     --non-interactive 2>/dev/null && {
     # Switch to full SSL config

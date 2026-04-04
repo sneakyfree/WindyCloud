@@ -5,8 +5,10 @@ import {
   Cloud,
   Clock,
   Download,
+  ExternalLink,
   HardDrive,
   Loader2,
+  MessageSquare,
   RefreshCw,
   TrendingUp,
   Upload,
@@ -260,6 +262,41 @@ export default function Dashboard() {
           >
             Upgrade <ArrowUpRight className="w-3 h-3" />
           </Link>
+        </div>
+      )}
+
+      {/* Empty state — new user with no files */}
+      {usage && total === 0 && files.length === 0 && (
+        <div className="bg-[var(--bg-card)] rounded-xl p-8 border border-[var(--border)] text-center">
+          <Cloud className="w-14 h-14 mx-auto mb-4 text-[var(--accent)] opacity-60" />
+          <p className="text-lg font-medium mb-2">
+            Your Windy Cloud is empty
+          </p>
+          <p className="text-sm text-[var(--text-muted)] mb-6 max-w-lg mx-auto">
+            Start using Windy products and your data will appear here
+            automatically. Each product syncs to your cloud storage.
+          </p>
+          <div className="grid grid-cols-2 md:grid-cols-5 gap-3 max-w-2xl mx-auto">
+            {[
+              { name: "Windy Word", desc: "Recordings", color: "#f59e0b", icon: Upload },
+              { name: "Windy Chat", desc: "Encrypted backups", color: "#6366f1", icon: MessageSquare },
+              { name: "Windy Mail", desc: "Email archives", color: "#ec4899", icon: HardDrive },
+              { name: "Windy Fly", desc: "Agent backups", color: "#22c55e", icon: Zap },
+              { name: "Windy Code", desc: "Settings sync", color: "#06b6d4", icon: ExternalLink },
+            ].map((p) => (
+              <div
+                key={p.name}
+                className="p-3 rounded-lg border border-[var(--border)] text-center"
+              >
+                <p.icon
+                  className="w-5 h-5 mx-auto mb-1"
+                  style={{ color: p.color }}
+                />
+                <p className="text-xs font-medium">{p.name}</p>
+                <p className="text-xs text-[var(--text-muted)]">{p.desc}</p>
+              </div>
+            ))}
+          </div>
         </div>
       )}
 

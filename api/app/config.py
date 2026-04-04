@@ -7,8 +7,8 @@ from pydantic_settings import BaseSettings
 
 class Settings(BaseSettings):
     # Auth
-    windy_pro_jwks_url: str = "https://windypro.thewindstorm.uk/.well-known/jwks.json"
-    eternitas_jwks_url: str = "https://eternitas.thewindstorm.uk/.well-known/eternitas-keys"
+    windy_pro_jwks_url: str = "https://windyword.ai/.well-known/jwks.json"
+    eternitas_jwks_url: str = "https://eternitas.ai/.well-known/eternitas-keys"
 
     # R2 Storage
     r2_account_id: str = ""
@@ -42,7 +42,7 @@ class Settings(BaseSettings):
     port: int = 8200
     log_level: str = "info"
     dev_mode: bool = False
-    cors_origins: str = "https://windypro.thewindstorm.uk"
+    cors_origins: str = "https://windyword.ai,https://windycloud.com"
 
     # Quotas
     default_storage_quota: int = 524_288_000  # 500MB
