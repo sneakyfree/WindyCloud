@@ -95,6 +95,11 @@ def create_app() -> FastAPI:
     app.include_router(billing_router, prefix="/api/v1/billing", tags=["billing"])
     app.include_router(servers_router, prefix="/api/v1/servers", tags=["servers"])
 
+    # Agent-compatible aliases — windy-agent calls /api/v1/files and /api/v1/billing/summary
+    app.include_router(
+        storage_router, prefix="/api/v1", tags=["agent-compat"], include_in_schema=False
+    )
+
     # Static files (PWA manifest, landing page, service worker)
     app.mount("/static", StaticFiles(directory=str(STATIC_DIR)), name="static")
 

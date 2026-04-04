@@ -42,3 +42,29 @@ class BillingEstimateResponse(BaseModel):
     storage_cost_cents: int
     compute_cost_cents: int
     total_estimated_cents: int
+
+
+class BillingSyncRequest(BaseModel):
+    windy_identity_id: str
+
+
+class BillingSyncResponse(BaseModel):
+    identity_id: str
+    month: str
+    storage_bytes: int
+    storage_file_count: int
+    compute_minutes: float
+    compute_cost_cents: int
+    server_count: int
+    server_monthly_cost_cents: int
+    total_cost_cents: int
+
+
+class BillingSummaryResponse(BaseModel):
+    identity_id: str
+    storage_used: str
+    storage_quota: str
+    storage_percent: float
+    compute_minutes_used: float
+    compute_free_remaining: float
+    total_cost_cents: int

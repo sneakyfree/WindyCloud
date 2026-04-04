@@ -5,19 +5,39 @@ services:
       - "8200:8200"
     env_file:
       - .env
+    environment:
+      DATABASE_URL: postgresql+asyncpg://windy:${POSTGRES_PASSWORD:-windycloud}@postgres:5432/windy_cloud
     volumes:
-      - cloud-data:/app/data  # SQLite DB + local file storage persist here
+      - cloud-data:/app/data
+    depends_on:
+      postgres:
+        condition: service_healthy
     restart: unless-stopped
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8200/health"]
       interval: 30s
       timeout: 5s
       retries: 3
-      start_period: 10s
+      start_period: 15s
 
-  # Dev: docker compose -f docker-compose.yml -f docker-compose.dev.yml up
-  # adds ./api:/app/api for hot-reload
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: windy
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-windycloud}
+      POSTGRES_DB: windy_cloud
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U windy -d windy_cloud"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
 
 volumes:
   cloud-data:
+    driver: local
+  postgres-data:
     driver: local

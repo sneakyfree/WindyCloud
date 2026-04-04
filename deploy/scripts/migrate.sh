@@ -1,8 +1,18 @@
 #!/usr/bin/env bash
-# Run database migrations — currently auto-creates tables on startup
-# This script is a placeholder for when Alembic is added
+# Run Alembic database migrations
 set -euo pipefail
 
-echo "Windy Cloud — Database Migration"
-echo "Tables are auto-created on app startup via SQLAlchemy create_all."
-echo "For production, add Alembic migrations to api/app/db/migrations/."
+echo "=== Windy Cloud — Database Migration ==="
+
+cd /app 2>/dev/null || cd "$(dirname "$0")/../.."
+
+# Use DATABASE_URL from environment if set
+if [ -n "${DATABASE_URL:-}" ]; then
+    export ALEMBIC_DATABASE_URL="$DATABASE_URL"
+    echo "Using DATABASE_URL from environment"
+else
+    echo "Using default SQLite (dev mode)"
+fi
+
+python -m alembic upgrade head
+echo "Migration complete."

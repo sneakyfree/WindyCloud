@@ -64,8 +64,8 @@ def get_eternitas_validator() -> JWKSValidator:
 
 
 def extract_identity_id(claims: dict[str, Any]) -> str:
-    """Extract windy_identity_id from JWT claims.
+    """Extract identity from JWT claims.
 
-    Checks 'windy_identity_id', then 'sub' as fallback.
+    Priority: windy_identity_id → passport_number (EPT) → sub (fallback).
     """
-    return claims.get("windy_identity_id") or claims["sub"]
+    return claims.get("windy_identity_id") or claims.get("passport_number") or claims["sub"]
