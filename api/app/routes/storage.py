@@ -302,6 +302,64 @@ STORAGE_PLANS = [
 ]
 
 
+@router.get("/breakdown")
+async def storage_breakdown(
+    user: AuthenticatedUser = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """Per-product storage breakdown for dashboard chart."""
+    result = await db.execute(
+        select(
+            FileRecord.product,
+            func.coalesce(func.sum(FileRecord.size_bytes), 0),
+            func.count(FileRecord.id),
+        )
+        .where(FileRecord.identity_id == user.identity_id)
+        .group_by(FileRecord.product)
+    )
+    products = []
+    for product, total_bytes, file_count in result.all():
+        products.append({"product": product, "bytes": total_bytes, "file_count": file_count})
+    return {"products": products}
+
+
+@router.get("/export")
+async def export_data(
+    user: AuthenticatedUser = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """Package all user files into a ZIP for GDPR data export."""
+    import io
+    import zipfile
+
+    from fastapi.responses import StreamingResponse
+
+    result = await db.execute(
+        select(FileRecord)
+        .where(FileRecord.identity_id == user.identity_id)
+        .order_by(FileRecord.product, FileRecord.created_at)
+    )
+    records = result.scalars().all()
+
+    provider = _get_provider()
+    buf = io.BytesIO()
+    with zipfile.ZipFile(buf, "w", zipfile.ZIP_DEFLATED) as zf:
+        for record in records:
+            try:
+                data, _ = await provider.download(record.storage_key)
+                path = f"{record.product}/{record.file_type}/{record.filename}"
+                zf.writestr(path, data)
+            except Exception:
+                logger.warning("Skipping file %s in export", record.storage_key)
+
+    buf.seek(0)
+    return StreamingResponse(
+        buf,
+        media_type="application/zip",
+        headers={"Content-Disposition": 'attachment; filename="windy-cloud-export.zip"'},
+    )
+
+
 @router.get("/plans", response_model=StoragePlansResponse)
 async def storage_plans():
     """Public endpoint — no auth required. Returns storage tier pricing."""

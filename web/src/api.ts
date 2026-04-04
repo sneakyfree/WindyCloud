@@ -121,6 +121,38 @@ export function deleteFile(fileId: string): Promise<{ deleted: boolean }> {
   return apiFetch(`/storage/files/${fileId}`, { method: "DELETE" });
 }
 
+export interface ProductBreakdown {
+  product: string;
+  bytes: number;
+  file_count: number;
+}
+
+export function getStorageBreakdown(): Promise<{
+  products: ProductBreakdown[];
+}> {
+  return apiFetch("/storage/breakdown");
+}
+
+export async function exportAllData(
+  onProgress?: (pct: number) => void
+): Promise<void> {
+  onProgress?.(10);
+  const res = await fetch(`${API_BASE}/storage/export`, {
+    headers: headers(),
+  });
+  if (!res.ok) throw new Error("Export failed");
+  onProgress?.(60);
+  const blob = await res.blob();
+  onProgress?.(90);
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = "windy-cloud-export.zip";
+  a.click();
+  URL.revokeObjectURL(url);
+  onProgress?.(100);
+}
+
 // --- Compute ---
 
 export interface ComputeUsage {

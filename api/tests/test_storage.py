@@ -165,6 +165,64 @@ async def test_storage_plans_no_auth(client):
 
 
 @pytest.mark.asyncio
+async def test_storage_breakdown(client):
+    """Breakdown returns per-product usage."""
+    await client.post(
+        "/api/v1/storage/upload",
+        files={"file": ("a.txt", b"aaa", "text/plain")},
+        data={"product": "windy_chat"},
+        headers={"Authorization": "Bearer fake"},
+    )
+    await client.post(
+        "/api/v1/storage/upload",
+        files={"file": ("b.txt", b"bbbbb", "text/plain")},
+        data={"product": "windy_pro"},
+        headers={"Authorization": "Bearer fake"},
+    )
+
+    resp = await client.get(
+        "/api/v1/storage/breakdown",
+        headers={"Authorization": "Bearer fake"},
+    )
+    assert resp.status_code == 200
+    products = resp.json()["products"]
+    assert len(products) == 2
+    by_product = {p["product"]: p for p in products}
+    assert by_product["windy_chat"]["bytes"] == 3
+    assert by_product["windy_pro"]["bytes"] == 5
+
+
+@pytest.mark.asyncio
+async def test_data_export(client):
+    """Export returns a ZIP with uploaded files."""
+    await client.post(
+        "/api/v1/storage/upload",
+        files={"file": ("test.txt", b"export-me", "text/plain")},
+        data={"product": "general"},
+        headers={"Authorization": "Bearer fake"},
+    )
+
+    resp = await client.get(
+        "/api/v1/storage/export",
+        headers={"Authorization": "Bearer fake"},
+    )
+    assert resp.status_code == 200
+    assert resp.headers["content-type"] == "application/zip"
+    assert len(resp.content) > 0
+
+
+@pytest.mark.asyncio
+async def test_data_export_empty(client):
+    """Export with no files returns an empty ZIP."""
+    resp = await client.get(
+        "/api/v1/storage/export",
+        headers={"Authorization": "Bearer fake"},
+    )
+    assert resp.status_code == 200
+    assert resp.headers["content-type"] == "application/zip"
+
+
+@pytest.mark.asyncio
 async def test_landing_page(client):
     """Landing page should serve HTML with Windy Cloud title."""
     resp = await client.get("/")
