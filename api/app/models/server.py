@@ -68,3 +68,21 @@ class ServerDeleteResponse(BaseModel):
     server_id: str
     deleted: bool
     message: str = "Server terminated"
+
+
+class DeployFlyRequest(BaseModel):
+    plan: str = "starter"
+    region: str = "us-east-1"
+    agent_name: str | None = None
+    hostname: str | None = None
+
+
+class DeployFlyResponse(BaseModel):
+    server_id: str
+    status: str
+    ip_address: str | None = None
+    hostname: str | None = None
+    plan_id: str
+    agent_name: str | None = None
+    dashboard_url: str | None = None
+    message: str = "Windy Fly agent server provisioning started"

@@ -9,6 +9,7 @@ import re
 import uuid
 
 from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile, status
+from fastapi.responses import Response
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -16,7 +17,12 @@ from api.app.auth.dependencies import AuthenticatedUser, get_current_user
 from api.app.config import settings
 from api.app.db.engine import get_db
 from api.app.db.models import FileRecord
-from api.app.models.storage import ArchiveResponse
+from api.app.models.storage import (
+    ArchiveResponse,
+    MigrateRequest,
+    MigrateResponse,
+    MigrateResult,
+)
 
 logger = logging.getLogger(__name__)
 router = APIRouter()
@@ -215,3 +221,131 @@ async def archive_code_settings(
     db: AsyncSession = Depends(get_db),
 ):
     return await _archive_upload("code-settings", file, metadata, user, db)
+
+
+@router.post("/migrate", response_model=MigrateResponse)
+async def archive_migrate(
+    body: MigrateRequest,
+    user: AuthenticatedUser = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """Hot → cold storage migration. Products call this to archive files to R2.
+
+    Accepts file metadata (not the file bytes) — products should call
+    POST /api/v1/storage/upload for each file first, then call this to
+    register the migration and set retention policies.
+    Alternatively, products can upload files directly to archive/{product}
+    endpoints. This endpoint handles batch metadata registration.
+    """
+    # Validate product
+    valid_products = {v["product"] for v in ARCHIVE_TYPES.values()}
+    if body.product not in valid_products and body.product != "general":
+        raise HTTPException(status_code=400, detail=f"Unknown product: {body.product}")
+
+    results = []
+    for file_entry in body.files:
+        filename = _sanitize_filename(file_entry.filename)
+
+        # Check if file already exists in cold storage
+        existing = await db.execute(
+            select(FileRecord).where(
+                FileRecord.identity_id == body.windy_identity_id,
+                FileRecord.product == body.product,
+                FileRecord.filename == filename,
+            )
+        )
+        record = existing.scalar_one_or_none()
+
+        if record:
+            # Already migrated — update retention if specified
+            if file_entry.retention_days is not None:
+                record.retention_days = file_entry.retention_days
+            if file_entry.retention_count is not None:
+                record.retention_count = file_entry.retention_count
+            results.append(
+                MigrateResult(
+                    filename=filename,
+                    file_id=record.id,
+                    key=record.storage_key,
+                    size=record.size_bytes,
+                    status="already_exists",
+                )
+            )
+        else:
+            # Register migration record — file was already uploaded via storage/upload
+            file_id = str(uuid.uuid4())
+            key = f"{body.windy_identity_id}/{body.product}/archive/{filename}"
+            new_record = FileRecord(
+                id=file_id,
+                identity_id=body.windy_identity_id,
+                product=body.product,
+                file_type="archive",
+                filename=filename,
+                storage_key=key,
+                size_bytes=file_entry.size,
+                content_type=file_entry.content_type,
+                encrypted=file_entry.encrypted,
+                retention_days=file_entry.retention_days,
+                retention_count=file_entry.retention_count,
+            )
+            db.add(new_record)
+            results.append(
+                MigrateResult(
+                    filename=filename,
+                    file_id=file_id,
+                    key=key,
+                    size=file_entry.size,
+                    status="migrated",
+                )
+            )
+
+    await db.commit()
+    return MigrateResponse(
+        product=body.product,
+        identity_id=body.windy_identity_id,
+        migrated=len([r for r in results if r.status == "migrated"]),
+        results=results,
+    )
+
+
+@router.get("/retrieve/{product}/{filename:path}")
+async def archive_retrieve(
+    product: str,
+    filename: str,
+    user: AuthenticatedUser = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """Retrieve a file from cold storage. Used when a product needs archived data back.
+
+    Example: user requests an old email, archived recording, or agent backup.
+    """
+    filename = _sanitize_filename(filename)
+
+    result = await db.execute(
+        select(FileRecord).where(
+            FileRecord.identity_id == user.identity_id,
+            FileRecord.product == product,
+            FileRecord.filename == filename,
+        )
+    )
+    record = result.scalar_one_or_none()
+    if not record:
+        raise HTTPException(status_code=404, detail="Archived file not found")
+
+    provider = _get_provider()
+    try:
+        data, content_type = await provider.download(record.storage_key)
+    except FileNotFoundError:
+        raise HTTPException(status_code=404, detail="File not found in storage backend")
+    except Exception:
+        logger.exception("Cold storage retrieval failed for key %s", record.storage_key)
+        raise HTTPException(status_code=502, detail="Storage backend error")
+
+    safe_name = (
+        record.filename.replace("\\", "_").replace('"', "_").replace("\n", "_").replace("\r", "_")
+    )
+    return Response(
+        content=data,
+        media_type=content_type,
+        headers={"Content-Disposition": f'attachment; filename="{safe_name}"'},
+    )

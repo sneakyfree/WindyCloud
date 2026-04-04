@@ -14,6 +14,8 @@ from api.app.db.engine import get_db
 from api.app.db.models import ServerRecord
 from api.app.models.server import (
     ActionResult,
+    DeployFlyRequest,
+    DeployFlyResponse,
     PlansResponse,
     ServerActionRequest,
     ServerCreateRequest,
@@ -262,3 +264,84 @@ async def delete_server(
     await db.commit()
 
     return ServerDeleteResponse(server_id=server_id, deleted=True)
+
+
+@router.post("/deploy-fly", response_model=DeployFlyResponse)
+async def deploy_fly(
+    body: DeployFlyRequest,
+    user: AuthenticatedUser = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """Provision an EC2 instance pre-configured for Windy Fly agent hosting.
+
+    1. Provisions EC2 instance with the selected plan
+    2. Configures user-data to install Docker + windy-agent
+    3. Returns instance details including dashboard URL
+    """
+    provider = _get_provider()
+    if provider is None:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="VPS provisioning is not configured. Set AWS credentials.",
+        )
+
+    # Enforce per-user server limit
+    count_result = await db.execute(
+        select(func.count(ServerRecord.id)).where(
+            ServerRecord.identity_id == user.identity_id,
+            ServerRecord.status != "terminated",
+        )
+    )
+    active_count = count_result.scalar() or 0
+    if active_count >= settings.max_servers_per_user:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail=f"Maximum of {settings.max_servers_per_user} active servers per user",
+        )
+
+    # Validate plan
+    plans = {p.plan_id: p for p in _plans_from_provider()}
+    if body.plan not in plans:
+        raise HTTPException(status_code=400, detail=f"Unknown plan: {body.plan}")
+
+    plan_info = plans[body.plan]
+    agent_name = body.agent_name or f"fly-{user.identity_id[:8]}"
+    hostname = body.hostname or f"{agent_name}.windyfly.ai"
+
+    try:
+        result = await provider.create(
+            identity_id=user.identity_id,
+            plan=body.plan,
+            region=body.region,
+            image="ubuntu-24-04",
+            hostname=hostname,
+        )
+    except (ValueError, RuntimeError) as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+    record = ServerRecord(
+        identity_id=user.identity_id,
+        plan_id=body.plan,
+        region=body.region,
+        image="ubuntu-24-04",
+        status=result["status"],
+        provider_instance_id=result.get("provider_instance_id"),
+        ip_address=result.get("ip_address"),
+        hostname=hostname,
+        monthly_cost_cents=plan_info.price_cents_per_month,
+    )
+    db.add(record)
+    await db.commit()
+
+    ip = result.get("ip_address")
+    dashboard_url = f"http://{ip}:3000" if ip else None
+
+    return DeployFlyResponse(
+        server_id=record.id,
+        status=record.status,
+        ip_address=ip,
+        hostname=hostname,
+        plan_id=body.plan,
+        agent_name=agent_name,
+        dashboard_url=dashboard_url,
+    )

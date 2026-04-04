@@ -38,15 +38,18 @@ jobs:
           cache-from: type=gha
           cache-to: type=gha,mode=max
 
-      - name: Deploy to VPS
+      - name: Deploy to AWS
         uses: appleboy/ssh-action@v1
         with:
-          host: 72.60.118.54
-          username: root
+          host: ${{ secrets.DEPLOY_HOST }}
+          username: ubuntu
           key: ${{ secrets.DEPLOY_SSH_KEY }}
           script: |
             cd /opt/windy-cloud
             docker compose pull
             docker compose up -d
             docker image prune -f
+            # Verify health
+            sleep 5
+            curl -sf http://localhost:8200/health || echo "WARNING: health check failed"
             echo "Deployed $(docker inspect --format='{{.Image}}' windy-cloud-cloud-1 | cut -c8-19)"

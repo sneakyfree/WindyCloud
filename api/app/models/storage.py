@@ -90,3 +90,37 @@ class StoragePlan(BaseModel):
 
 class StoragePlansResponse(BaseModel):
     plans: list[StoragePlan]
+
+
+# --- Cold Storage Migration ---
+
+
+class MigrateFileEntry(BaseModel):
+    filename: str
+    size: int
+    content_type: str = "application/octet-stream"
+    retention_days: int | None = None
+    retention_count: int | None = None
+    encrypted: bool = False
+
+
+class MigrateRequest(BaseModel):
+    product: str
+    windy_identity_id: str
+    files: list[MigrateFileEntry]
+
+
+class MigrateResult(BaseModel):
+    filename: str
+    file_id: str
+    key: str
+    size: int
+    status: str = "migrated"
+
+
+class MigrateResponse(BaseModel):
+    product: str
+    identity_id: str
+    migrated: int
+    results: list[MigrateResult]
+    message: str = "Cold storage migration complete"

@@ -19,7 +19,11 @@ async def health():
 async def status_endpoint():
     # Storage is always enabled — falls back to local disk
     storage_enabled = True
-    compute_enabled = bool(settings.runpod_api_key) or settings.use_mock_providers
+    compute_enabled = (
+        bool(settings.runpod_api_key)
+        or bool(settings.sagemaker_endpoint_name)
+        or settings.use_mock_providers
+    )
     servers_enabled = bool(settings.aws_access_key_id) or settings.use_mock_providers
 
     def _provider(real: str, is_real: bool) -> str:
@@ -39,7 +43,10 @@ async def status_endpoint():
             },
             "compute": {
                 "enabled": compute_enabled,
-                "provider": _provider("runpod", bool(settings.runpod_api_key)),
+                "provider": _provider(
+                    "runpod" if settings.runpod_api_key else "sagemaker",
+                    bool(settings.runpod_api_key) or bool(settings.sagemaker_endpoint_name),
+                ),
             },
             "servers": {
                 "enabled": servers_enabled,

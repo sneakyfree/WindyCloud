@@ -26,10 +26,15 @@ router = APIRouter()
 
 
 def _get_stt_provider():
+    """Return the best available STT provider: RunPod → SageMaker → Mock → None."""
     if settings.runpod_api_key:
         from api.app.providers.runpod import RunPodSTTProvider
 
         return RunPodSTTProvider()
+    if settings.sagemaker_endpoint_name and settings.aws_access_key_id:
+        from api.app.providers.sagemaker import SageMakerSTTProvider
+
+        return SageMakerSTTProvider()
     if settings.use_mock_providers:
         from api.app.providers.stt_base import MockSTTProvider
 

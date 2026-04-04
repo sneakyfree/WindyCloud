@@ -20,16 +20,22 @@ class Settings(BaseSettings):
     # Database
     database_url: str = "sqlite+aiosqlite:///data/windy_cloud.db"
 
-    # Compute
+    # Compute — RunPod (Phase 1)
     runpod_api_key: str = ""
     runpod_endpoint_id: str = ""
     stt_markup: float = 3.0
     stt_free_minutes: int = 10
 
+    # Compute — AWS SageMaker (Phase 2)
+    sagemaker_endpoint_name: str = ""
+
     # AWS
     aws_access_key_id: str = ""
     aws_secret_access_key: str = ""
     aws_region: str = "us-east-1"
+
+    # Deploy host (for CI/CD SSH target)
+    deploy_host: str = ""
 
     # Server
     host: str = "0.0.0.0"
