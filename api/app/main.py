@@ -84,9 +84,11 @@ def create_app() -> FastAPI:
     from api.app.routes.archive import router as archive_router
     from api.app.routes.billing import router as billing_router
     from api.app.routes.compute import router as compute_router
+    from api.app.routes.export import router as export_router
     from api.app.routes.health import router as health_router
     from api.app.routes.servers import router as servers_router
     from api.app.routes.storage import router as storage_router
+    from api.app.routes.sync import router as sync_router
 
     app.include_router(health_router)
     app.include_router(storage_router, prefix="/api/v1/storage", tags=["storage"])
@@ -94,6 +96,8 @@ def create_app() -> FastAPI:
     app.include_router(compute_router, prefix="/api/v1/compute", tags=["compute"])
     app.include_router(billing_router, prefix="/api/v1/billing", tags=["billing"])
     app.include_router(servers_router, prefix="/api/v1/servers", tags=["servers"])
+    app.include_router(sync_router, prefix="/api/v1/sync", tags=["sync"])
+    app.include_router(export_router, prefix="/api/v1/export", tags=["export"])
 
     # Agent-compatible aliases — windy-agent calls /api/v1/files and /api/v1/billing/summary
     app.include_router(

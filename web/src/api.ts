@@ -268,6 +268,45 @@ export function getPlans(): Promise<{ plans: StoragePlan[] }> {
   return apiFetch("/storage/plans");
 }
 
+// --- Sync ---
+
+export interface SyncProduct {
+  product: string;
+  label: string;
+  schedule: string;
+  last_backup: string;
+  last_backup_at: string | null;
+  next_backup: string | null;
+  bytes_synced: number;
+  file_count: number;
+  health: "green" | "yellow" | "red" | "gray";
+}
+
+export function getSyncStatus(): Promise<{ products: SyncProduct[] }> {
+  return apiFetch("/sync/status");
+}
+
+// --- Export ---
+
+export interface ExportJobStatus {
+  job_id: string;
+  status: string;
+  total_files: number;
+  processed_files: number;
+  progress_percent: number;
+  download_url?: string;
+  expires_at?: string;
+  error?: string;
+}
+
+export function requestExport(): Promise<ExportJobStatus> {
+  return apiFetch("/export/my-data", { method: "POST" });
+}
+
+export function getExportStatus(jobId: string): Promise<ExportJobStatus> {
+  return apiFetch(`/export/${jobId}`);
+}
+
 // --- Auth ---
 
 export function isLoggedIn(): boolean {

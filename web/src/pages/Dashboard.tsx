@@ -15,14 +15,18 @@ import {
 import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import {
+  type ExportJobStatus,
   type FileInfo,
   type ProductBreakdown,
+  type SyncProduct,
   type UsageResponse,
-  exportAllData,
   getBillingUsage,
+  getExportStatus,
   getStorageBreakdown,
+  getSyncStatus,
   getUsage,
   listFiles,
+  requestExport,
 } from "../api";
 import {
   formatBytes,
@@ -100,59 +104,12 @@ function DonutChart({
   );
 }
 
-// --- Sync status cards ---
-
-interface SyncStatus {
-  product: string;
-  label: string;
-  schedule: string;
-  lastSync: string;
-  nextSync: string;
-  ok: boolean;
-}
-
-const SYNC_STATUSES: SyncStatus[] = [
-  {
-    product: "windy_chat",
-    label: "Windy Chat",
-    schedule: "Encrypted backup every 24h",
-    lastSync: "2 hours ago",
-    nextSync: "in 22 hours",
-    ok: true,
-  },
-  {
-    product: "windy_mail",
-    label: "Windy Mail",
-    schedule: "Auto-archive emails older than 90 days",
-    lastSync: "Yesterday",
-    nextSync: "Daily at midnight",
-    ok: true,
-  },
-  {
-    product: "windy_fly",
-    label: "Windy Fly",
-    schedule: "Database backup daily at 3am",
-    lastSync: "5 hours ago",
-    nextSync: "in 19 hours",
-    ok: true,
-  },
-  {
-    product: "windy_pro",
-    label: "Windy Word",
-    schedule: "Recordings sync on save",
-    lastSync: "3 days ago",
-    nextSync: "On next recording",
-    ok: true,
-  },
-  {
-    product: "windy_code",
-    label: "Windy Code",
-    schedule: "Settings sync",
-    lastSync: "Never",
-    nextSync: "-",
-    ok: false,
-  },
-];
+const HEALTH_COLOR: Record<string, string> = {
+  green: "var(--green)",
+  yellow: "var(--yellow)",
+  red: "var(--red)",
+  gray: "var(--text-muted)",
+};
 
 export default function Dashboard() {
   const [usage, setUsage] = useState<UsageResponse | null>(null);
@@ -162,8 +119,9 @@ export default function Dashboard() {
     compute: { total_jobs: number };
   } | null>(null);
   const [breakdown, setBreakdown] = useState<ProductBreakdown[]>([]);
+  const [syncProducts, setSyncProducts] = useState<SyncProduct[]>([]);
+  const [exportJob, setExportJob] = useState<ExportJobStatus | null>(null);
   const [exporting, setExporting] = useState(false);
-  const [exportPct, setExportPct] = useState(0);
 
   useEffect(() => {
     getUsage().then(setUsage).catch(() => {});
@@ -176,6 +134,9 @@ export default function Dashboard() {
     getStorageBreakdown()
       .then((r) => setBreakdown(r.products))
       .catch(() => {});
+    getSyncStatus()
+      .then((r) => setSyncProducts(r.products))
+      .catch(() => {});
   }, []);
 
   const pct = usage ? usage.used_percent : 0;
@@ -184,16 +145,29 @@ export default function Dashboard() {
 
   const handleExport = async () => {
     setExporting(true);
-    setExportPct(0);
     try {
-      await exportAllData((p) => setExportPct(p));
+      const job = await requestExport();
+      setExportJob(job);
+      // Poll for completion
+      if (job.status !== "completed") {
+        const poll = setInterval(async () => {
+          const status = await getExportStatus(job.job_id);
+          setExportJob(status);
+          if (status.status === "completed" || status.status === "failed") {
+            clearInterval(poll);
+            setExporting(false);
+            if (status.download_url) {
+              window.open(status.download_url, "_blank");
+            }
+          }
+        }, 1500);
+      } else {
+        setExporting(false);
+        if (job.download_url) window.open(job.download_url, "_blank");
+      }
     } catch {
-      // error handled in api
-    }
-    setTimeout(() => {
       setExporting(false);
-      setExportPct(0);
-    }, 1500);
+    }
   };
 
   return (
@@ -331,7 +305,10 @@ export default function Dashboard() {
             <RefreshCw className="w-4 h-4" /> Auto-Sync Status
           </h2>
           <div className="space-y-3">
-            {SYNC_STATUSES.map((s) => (
+            {syncProducts.length === 0 && (
+              <p className="text-sm text-[var(--text-muted)]">Loading...</p>
+            )}
+            {syncProducts.map((s) => (
               <div
                 key={s.product}
                 className="flex items-start gap-3 py-1.5"
@@ -339,27 +316,33 @@ export default function Dashboard() {
                 <div
                   className="w-2 h-2 rounded-full mt-1.5 flex-shrink-0"
                   style={{
-                    background: s.ok ? "var(--green)" : "var(--text-muted)",
+                    background: HEALTH_COLOR[s.health] || "var(--text-muted)",
                   }}
                 />
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center gap-2">
                     <span className="text-sm font-medium">{s.label}</span>
-                    {s.ok ? (
+                    {s.health === "green" && (
                       <Check className="w-3 h-3 text-[var(--green)]" />
-                    ) : (
-                      <AlertTriangle className="w-3 h-3 text-[var(--text-muted)]" />
+                    )}
+                    {s.health === "yellow" && (
+                      <AlertTriangle className="w-3 h-3 text-[var(--yellow)]" />
+                    )}
+                    {s.health === "red" && (
+                      <AlertTriangle className="w-3 h-3 text-[var(--red)]" />
                     )}
                   </div>
                   <p className="text-xs text-[var(--text-muted)]">
                     {s.schedule}
                   </p>
-                  {s.ok && (
-                    <p className="text-xs text-[var(--text-muted)] flex items-center gap-1 mt-0.5">
-                      <Clock className="w-3 h-3" />
-                      Last: {s.lastSync} &middot; Next: {s.nextSync}
-                    </p>
-                  )}
+                  <p className="text-xs text-[var(--text-muted)] flex items-center gap-1 mt-0.5">
+                    <Clock className="w-3 h-3" />
+                    Last: {s.last_backup}
+                    {s.next_backup && <> &middot; Next: {s.next_backup}</>}
+                    {s.file_count > 0 && (
+                      <> &middot; {s.file_count} file{s.file_count !== 1 ? "s" : ""} ({formatBytes(s.bytes_synced)})</>
+                    )}
+                  </p>
                 </div>
               </div>
             ))}
@@ -392,19 +375,19 @@ export default function Dashboard() {
             <Download className="w-4 h-4" />
           )}
           {exporting
-            ? exportPct >= 100
+            ? exportJob?.status === "completed"
               ? "Done!"
-              : `Exporting... ${exportPct}%`
+              : `Exporting... ${exportJob?.progress_percent || 0}%`
             : "Download My Data"}
         </button>
       </div>
 
       {/* Export progress bar */}
-      {exporting && (
+      {exporting && exportJob && (
         <div className="h-1.5 rounded-full bg-[var(--bg-hover)] overflow-hidden">
           <div
             className="h-full rounded-full bg-[var(--accent)] transition-all duration-300"
-            style={{ width: `${exportPct}%` }}
+            style={{ width: `${exportJob.progress_percent}%` }}
           />
         </div>
       )}

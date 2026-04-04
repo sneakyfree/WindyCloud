@@ -93,7 +93,7 @@ async def _do_upload(
     if current_usage + len(data) > settings.default_storage_quota:
         raise HTTPException(
             status_code=status.HTTP_507_INSUFFICIENT_STORAGE,
-            detail="Storage quota exceeded",
+            detail="Storage quota exceeded. Upgrade your plan for more space.",
         )
 
     filename = _sanitize_filename(file.filename or f"{uuid.uuid4()}")
@@ -245,6 +245,7 @@ async def delete_file(
 
 @router.get("/usage", response_model=UsageResponse)
 async def get_usage(
+    response: Response,
     user: AuthenticatedUser = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
@@ -258,11 +259,21 @@ async def get_usage(
     used_bytes = row[0]
     file_count = row[1]
     quota = settings.default_storage_quota
+    pct = round((used_bytes / quota) * 100, 2) if quota > 0 else 0
+
+    # Add storage warning header
+    if pct >= 100:
+        response.headers["X-Storage-Warning"] = "quota_exceeded"
+    elif pct >= 95:
+        response.headers["X-Storage-Warning"] = "critical"
+    elif pct >= 80:
+        response.headers["X-Storage-Warning"] = "approaching"
+
     return UsageResponse(
         used_bytes=used_bytes,
         file_count=file_count,
         quota_bytes=quota,
-        used_percent=round((used_bytes / quota) * 100, 2) if quota > 0 else 0,
+        used_percent=pct,
     )
 
 
