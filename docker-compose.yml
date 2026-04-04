@@ -20,6 +20,20 @@ services:
       retries: 3
       start_period: 15s
 
+  web:
+    build: ./web
+    ports:
+      - "80:80"
+    depends_on:
+      cloud:
+        condition: service_healthy
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:80"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+
   postgres:
     image: postgres:16-alpine
     environment:
