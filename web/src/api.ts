@@ -1,3 +1,5 @@
+import { showToast } from "./Toast";
+
 const API_BASE = "/api/v1";
 
 function getToken(): string {
@@ -23,8 +25,14 @@ async function apiFetch<T>(path: string, init?: RequestInit): Promise<T> {
     headers: { ...headers(), ...init?.headers },
   });
   if (!res.ok) {
+    if (res.status === 401 || res.status === 403) {
+      logout();
+      throw new Error("Session expired");
+    }
     const err = await res.json().catch(() => ({ detail: res.statusText }));
-    throw new Error(err.detail || res.statusText);
+    const msg = err.detail || res.statusText;
+    showToast(msg, "error");
+    throw new Error(msg);
   }
   return res.json();
 }
@@ -131,26 +139,6 @@ export function getStorageBreakdown(): Promise<{
   products: ProductBreakdown[];
 }> {
   return apiFetch("/storage/breakdown");
-}
-
-export async function exportAllData(
-  onProgress?: (pct: number) => void
-): Promise<void> {
-  onProgress?.(10);
-  const res = await fetch(`${API_BASE}/storage/export`, {
-    headers: headers(),
-  });
-  if (!res.ok) throw new Error("Export failed");
-  onProgress?.(60);
-  const blob = await res.blob();
-  onProgress?.(90);
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement("a");
-  a.href = url;
-  a.download = "windy-cloud-export.zip";
-  a.click();
-  URL.revokeObjectURL(url);
-  onProgress?.(100);
 }
 
 // --- Compute ---

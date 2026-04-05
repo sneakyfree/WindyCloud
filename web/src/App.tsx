@@ -6,11 +6,13 @@ import Compute from "./pages/Compute";
 import Dashboard from "./pages/Dashboard";
 import Files from "./pages/Files";
 import Login from "./pages/Login";
+import NotFound from "./pages/NotFound";
 import Servers from "./pages/Servers";
 import SettingsPage from "./pages/SettingsPage";
 
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
-  return isLoggedIn() ? <>{children}</> : <Navigate to="/login" replace />;
+  if (!isLoggedIn()) return <Navigate to="/login" replace />;
+  return <>{children}</>;
 }
 
 export default function App() {
@@ -32,6 +34,7 @@ export default function App() {
           <Route path="/billing" element={<Billing />} />
           <Route path="/settings" element={<SettingsPage />} />
         </Route>
+        <Route path="*" element={<NotFound />} />
       </Routes>
     </BrowserRouter>
   );
