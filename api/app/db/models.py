@@ -40,6 +40,34 @@ class FileRecord(Base):
     )
 
 
+class UserPlan(Base):
+    """Per-user storage plan tier."""
+
+    __tablename__ = "user_plans"
+
+    identity_id: Mapped[str] = mapped_column(String(36), primary_key=True)
+    plan_id: Mapped[str] = mapped_column(String(20), default="free")
+    quota_bytes: Mapped[int] = mapped_column(BigInteger, default=524_288_000)
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=lambda: datetime.now(timezone.utc)
+    )
+
+
+class AnalyticsEvent(Base):
+    """Daily analytics counters."""
+
+    __tablename__ = "analytics_events"
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=lambda: str(uuid.uuid4()))
+    date: Mapped[str] = mapped_column(String(10), nullable=False)
+    event_type: Mapped[str] = mapped_column(String(50), nullable=False)
+    product: Mapped[str | None] = mapped_column(String(50), nullable=True)
+    count: Mapped[int] = mapped_column(Integer, default=0)
+    value: Mapped[int] = mapped_column(BigInteger, default=0)
+
+    __table_args__ = (Index("ix_analytics_date_type", "date", "event_type"),)
+
+
 class ComputeJob(Base):
     """Individual STT compute job."""
 

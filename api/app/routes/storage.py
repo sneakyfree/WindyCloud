@@ -16,7 +16,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from api.app.auth.dependencies import AuthenticatedUser, get_current_user
 from api.app.config import settings
 from api.app.db.engine import get_db
-from api.app.db.models import FileRecord
+from api.app.db.models import FileRecord, UserPlan
 from api.app.models.storage import (
     DeleteResponse,
     FileInfo,
@@ -26,6 +26,7 @@ from api.app.models.storage import (
     UploadResponse,
     UsageResponse,
 )
+from api.app.tasks.analytics import track_event
 
 logger = logging.getLogger(__name__)
 router = APIRouter()
@@ -83,6 +84,11 @@ async def _do_upload(
             detail=f"File exceeds maximum size of {settings.max_upload_size} bytes",
         )
 
+    # Get user's plan quota (or fall back to global default)
+    plan_result = await db.execute(select(UserPlan).where(UserPlan.identity_id == user.identity_id))
+    user_plan = plan_result.scalar_one_or_none()
+    quota = user_plan.quota_bytes if user_plan else settings.default_storage_quota
+
     # Check quota
     usage_row = await db.execute(
         select(func.coalesce(func.sum(FileRecord.size_bytes), 0)).where(
@@ -90,7 +96,7 @@ async def _do_upload(
         )
     )
     current_usage = usage_row.scalar() or 0
-    if current_usage + len(data) > settings.default_storage_quota:
+    if current_usage + len(data) > quota:
         raise HTTPException(
             status_code=status.HTTP_507_INSUFFICIENT_STORAGE,
             detail="Storage quota exceeded. Upgrade your plan for more space.",
@@ -126,6 +132,7 @@ async def _do_upload(
         metadata_json=metadata if metadata != "{}" else None,
     )
     db.add(record)
+    await track_event(db, "file_upload", product=product, value=len(data))
     await db.commit()
 
     return UploadResponse(**result)
@@ -258,7 +265,11 @@ async def get_usage(
     row = result.one()
     used_bytes = row[0]
     file_count = row[1]
-    quota = settings.default_storage_quota
+
+    # Get user's plan quota
+    plan_result = await db.execute(select(UserPlan).where(UserPlan.identity_id == user.identity_id))
+    user_plan = plan_result.scalar_one_or_none()
+    quota = user_plan.quota_bytes if user_plan else settings.default_storage_quota
     pct = round((used_bytes / quota) * 100, 2) if quota > 0 else 0
 
     # Add storage warning header

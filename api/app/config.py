@@ -49,6 +49,12 @@ class Settings(BaseSettings):
     max_upload_size: int = 1_073_741_824  # 1GB
     max_servers_per_user: int = 5
 
+    # Sentry
+    sentry_dsn: str = ""
+
+    # Pricing page (for upgrade redirects)
+    pricing_url: str = "https://windyword.ai/pricing"
+
     # Mock providers (for testing/dev without real cloud credentials)
     use_mock_providers: bool = False
 

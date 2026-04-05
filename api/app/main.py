@@ -21,6 +21,20 @@ from api.app.config import settings
 logger = logging.getLogger(__name__)
 STATIC_DIR = Path(__file__).parent / "static"
 
+# --- Sentry ---
+if settings.sentry_dsn:
+    try:
+        import sentry_sdk
+
+        sentry_sdk.init(
+            dsn=settings.sentry_dsn,
+            traces_sample_rate=0.1,
+            release=f"windy-cloud@{__version__}",
+        )
+        logger.info("Sentry initialized")
+    except ImportError:
+        logger.warning("sentry-sdk not installed, skipping Sentry init")
+
 
 async def _run_startup_tasks() -> None:
     """Run retention cleanup and billing snapshots on startup."""
@@ -81,6 +95,7 @@ def create_app() -> FastAPI:
     )
 
     # Routers
+    from api.app.routes.analytics import router as analytics_router
     from api.app.routes.archive import router as archive_router
     from api.app.routes.billing import router as billing_router
     from api.app.routes.compute import router as compute_router
@@ -98,6 +113,7 @@ def create_app() -> FastAPI:
     app.include_router(servers_router, prefix="/api/v1/servers", tags=["servers"])
     app.include_router(sync_router, prefix="/api/v1/sync", tags=["sync"])
     app.include_router(export_router, prefix="/api/v1/export", tags=["export"])
+    app.include_router(analytics_router, prefix="/api/v1/analytics", tags=["analytics"])
 
     # Agent-compatible aliases — windy-agent calls /api/v1/files and /api/v1/billing/summary
     app.include_router(

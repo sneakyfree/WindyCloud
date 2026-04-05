@@ -11,7 +11,13 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from api.app.auth.dependencies import AuthenticatedUser, get_current_user
 from api.app.config import settings
 from api.app.db.engine import get_db
-from api.app.db.models import BillingSnapshot, ComputeUsageRecord, FileRecord, ServerRecord
+from api.app.db.models import (
+    BillingSnapshot,
+    ComputeUsageRecord,
+    FileRecord,
+    ServerRecord,
+    UserPlan,
+)
 from api.app.models.billing import (
     BillingEstimateResponse,
     BillingHistoryEntry,
@@ -290,3 +296,67 @@ def _estimate_storage_cost(used_bytes: int) -> int:
     if used_mb <= 51200:
         return 500  # $5
     return 1000  # $10
+
+
+# --- Plan tier definitions ---
+PLAN_TIERS = {
+    "free": {"name": "Free", "quota_bytes": 524_288_000, "price_cents": 0},
+    "basic": {"name": "Basic", "quota_bytes": 5_368_709_120, "price_cents": 200},
+    "pro": {"name": "Pro", "quota_bytes": 53_687_091_200, "price_cents": 500},
+    "ultra": {"name": "Ultra", "quota_bytes": 214_748_364_800, "price_cents": 1000},
+}
+
+
+@router.get("/plan")
+async def get_plan(
+    user: AuthenticatedUser = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """Get user's current storage plan."""
+    result = await db.execute(select(UserPlan).where(UserPlan.identity_id == user.identity_id))
+    plan = result.scalar_one_or_none()
+    plan_id = plan.plan_id if plan else "free"
+    tier = PLAN_TIERS.get(plan_id, PLAN_TIERS["free"])
+    return {
+        "plan_id": plan_id,
+        "name": tier["name"],
+        "quota_bytes": tier["quota_bytes"],
+        "price_cents_per_month": tier["price_cents"],
+        "upgrade_url": settings.pricing_url,
+    }
+
+
+@router.post("/plan/upgrade")
+async def upgrade_plan(
+    body: dict,
+    user: AuthenticatedUser = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """Upgrade user's storage plan. Called after Stripe payment confirmation."""
+    new_plan_id = body.get("plan_id", "")
+    if new_plan_id not in PLAN_TIERS:
+        from fastapi import HTTPException
+
+        raise HTTPException(status_code=400, detail=f"Unknown plan: {new_plan_id}")
+
+    tier = PLAN_TIERS[new_plan_id]
+    result = await db.execute(select(UserPlan).where(UserPlan.identity_id == user.identity_id))
+    plan = result.scalar_one_or_none()
+    if plan:
+        plan.plan_id = new_plan_id
+        plan.quota_bytes = tier["quota_bytes"]
+    else:
+        plan = UserPlan(
+            identity_id=user.identity_id,
+            plan_id=new_plan_id,
+            quota_bytes=tier["quota_bytes"],
+        )
+        db.add(plan)
+    await db.commit()
+
+    return {
+        "plan_id": new_plan_id,
+        "name": tier["name"],
+        "quota_bytes": tier["quota_bytes"],
+        "message": f"Plan upgraded to {tier['name']}",
+    }
