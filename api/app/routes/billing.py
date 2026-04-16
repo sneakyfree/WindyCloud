@@ -5,10 +5,12 @@ from __future__ import annotations
 from datetime import datetime, timezone
 
 from fastapi import APIRouter, Depends, Query
+from pydantic import BaseModel
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from api.app.auth.dependencies import AuthenticatedUser, get_current_user
+from api.app.auth.webhook import verify_service_token
 from api.app.config import settings
 from api.app.db.engine import get_db
 from api.app.db.models import (
@@ -299,12 +301,129 @@ def _estimate_storage_cost(used_bytes: int) -> int:
 
 
 # --- Plan tier definitions ---
+def _tier_quotas() -> dict[str, int]:
+    """Wave 2 tier quotas — sourced from Settings, not hardcoded."""
+    return {
+        "free": settings.tier_quota_free,
+        "pro": settings.tier_quota_pro,
+        "ultra": settings.tier_quota_ultra,
+        "max": settings.tier_quota_max,
+    }
+
+
 PLAN_TIERS = {
     "free": {"name": "Free", "quota_bytes": 524_288_000, "price_cents": 0},
     "basic": {"name": "Basic", "quota_bytes": 5_368_709_120, "price_cents": 200},
     "pro": {"name": "Pro", "quota_bytes": 53_687_091_200, "price_cents": 500},
     "ultra": {"name": "Ultra", "quota_bytes": 214_748_364_800, "price_cents": 1000},
 }
+
+
+class AllocateRequest(BaseModel):
+    windy_identity_id: str
+    passport_number: str | None = None
+    tier: str = "free"
+
+
+class AllocateResponse(BaseModel):
+    plan_id: str
+    quota_bytes: int
+    tier: str
+    identity_id: str
+
+
+async def allocate_plan(
+    db: AsyncSession,
+    *,
+    windy_identity_id: str,
+    tier: str,
+    passport_number: str | None = None,
+) -> UserPlan:
+    """Idempotent upsert of a UserPlan for the given identity + tier.
+
+    Trust behavior (Wave 3):
+      - If `passport_number` is provided, consult the Eternitas Trust API
+        and set effective_quota = base_tier_quota * trust.tier_multiplier.
+      - If no passport (human identity via Pro JWT), the multiplier is
+        1.0 and the base tier quota applies unchanged.
+      - The multiplier in effect at allocation is persisted on the plan
+        for audit.
+
+    Raises ValueError if the tier is unknown.
+    """
+    from api.app.services.trust_client import TrustInfo, get_trust_client
+
+    quotas = _tier_quotas()
+    if tier not in quotas:
+        raise ValueError(f"Unknown tier: {tier}")
+    base_quota = quotas[tier]
+
+    if passport_number:
+        trust = await get_trust_client().get_trust(passport_number)
+        if trust is None:
+            # Passport not found at Eternitas — fail-open to standard
+            trust = TrustInfo.default_for_human()
+    else:
+        trust = TrustInfo.default_for_human()
+
+    multiplier = trust.tier_multiplier
+    effective_quota = int(base_quota * multiplier)
+
+    result = await db.execute(
+        select(UserPlan).where(UserPlan.identity_id == windy_identity_id)
+    )
+    plan = result.scalar_one_or_none()
+    if plan is None:
+        plan = UserPlan(
+            identity_id=windy_identity_id,
+            plan_id=tier,
+            tier=tier,
+            quota_bytes=effective_quota,
+            trust_multiplier_at_allocation=multiplier,
+        )
+        db.add(plan)
+    else:
+        plan.plan_id = tier
+        plan.tier = tier
+        plan.quota_bytes = effective_quota
+        plan.trust_multiplier_at_allocation = multiplier
+    await db.commit()
+    await db.refresh(plan)
+    return plan
+
+
+@router.post(
+    "/allocate",
+    response_model=AllocateResponse,
+    dependencies=[Depends(verify_service_token)],
+)
+async def billing_allocate(
+    body: AllocateRequest,
+    db: AsyncSession = Depends(get_db),
+):
+    """Provision (or refresh) a storage plan for a new identity.
+
+    Called by the identity-created webhook and by windy-agent's hatch
+    flow. Idempotent on windy_identity_id.
+    """
+    from fastapi import HTTPException
+
+    try:
+        plan = await allocate_plan(
+            db,
+            windy_identity_id=body.windy_identity_id,
+            tier=body.tier,
+            passport_number=body.passport_number,
+        )
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+    return AllocateResponse(
+        plan_id=plan.plan_id,
+        quota_bytes=plan.quota_bytes,
+        tier=plan.tier,
+        identity_id=plan.identity_id,
+    )
 
 
 @router.get("/plan")

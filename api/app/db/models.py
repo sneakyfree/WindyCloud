@@ -47,9 +47,32 @@ class UserPlan(Base):
 
     identity_id: Mapped[str] = mapped_column(String(36), primary_key=True)
     plan_id: Mapped[str] = mapped_column(String(20), default="free")
+    tier: Mapped[str] = mapped_column(String(20), default="free", nullable=False)
     quota_bytes: Mapped[int] = mapped_column(BigInteger, default=524_288_000)
+    frozen: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
+    trust_multiplier_at_allocation: Mapped[float | None] = mapped_column(
+        Float, nullable=True
+    )
     updated_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), default=lambda: datetime.now(timezone.utc)
+    )
+
+
+class IdentityBridge(Base):
+    """Passport ↔ Windy identity bridge (Wave 2 contract #3)."""
+
+    __tablename__ = "users_identity_bridge"
+
+    windy_identity_id: Mapped[str] = mapped_column(String(36), primary_key=True)
+    passport_number: Mapped[str] = mapped_column(String(64), nullable=False, unique=True)
+    operator_email: Mapped[str | None] = mapped_column(String(320), nullable=True)
+    linked_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=lambda: datetime.now(timezone.utc)
+    )
+    linked_by: Mapped[str | None] = mapped_column(String(100), nullable=True)
+
+    __table_args__ = (
+        Index("ix_identity_bridge_passport", "passport_number", unique=True),
     )
 
 

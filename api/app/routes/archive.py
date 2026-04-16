@@ -14,6 +14,7 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from api.app.auth.dependencies import AuthenticatedUser, get_current_user
+from api.app.auth.webhook import get_user_or_service
 from api.app.config import settings
 from api.app.db.engine import get_db
 from api.app.db.models import FileRecord
@@ -177,7 +178,7 @@ async def _do_archive_upload(
 async def archive_chat(
     file: UploadFile = File(...),
     metadata: str = Form('{"encrypted": true, "retention_count": 7}'),
-    user: AuthenticatedUser = Depends(get_current_user),
+    user: AuthenticatedUser = Depends(get_user_or_service),
     db: AsyncSession = Depends(get_db),
 ):
     return await _archive_upload("chat", file, metadata, user, db)
@@ -187,7 +188,7 @@ async def archive_chat(
 async def archive_mail(
     file: UploadFile = File(...),
     metadata: str = Form('{"retention_days": 90}'),
-    user: AuthenticatedUser = Depends(get_current_user),
+    user: AuthenticatedUser = Depends(get_user_or_service),
     db: AsyncSession = Depends(get_db),
 ):
     return await _archive_upload("mail", file, metadata, user, db)
@@ -197,7 +198,7 @@ async def archive_mail(
 async def archive_agent(
     file: UploadFile = File(...),
     metadata: str = Form("{}"),
-    user: AuthenticatedUser = Depends(get_current_user),
+    user: AuthenticatedUser = Depends(get_user_or_service),
     db: AsyncSession = Depends(get_db),
 ):
     return await _archive_upload("agent", file, metadata, user, db)
@@ -207,7 +208,7 @@ async def archive_agent(
 async def archive_recordings(
     file: UploadFile = File(...),
     metadata: str = Form("{}"),
-    user: AuthenticatedUser = Depends(get_current_user),
+    user: AuthenticatedUser = Depends(get_user_or_service),
     db: AsyncSession = Depends(get_db),
 ):
     return await _archive_upload("recordings", file, metadata, user, db)
@@ -217,7 +218,7 @@ async def archive_recordings(
 async def archive_code_settings(
     file: UploadFile = File(...),
     metadata: str = Form("{}"),
-    user: AuthenticatedUser = Depends(get_current_user),
+    user: AuthenticatedUser = Depends(get_user_or_service),
     db: AsyncSession = Depends(get_db),
 ):
     return await _archive_upload("code-settings", file, metadata, user, db)

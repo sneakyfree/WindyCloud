@@ -7,6 +7,7 @@ from httpx import ASGITransport, AsyncClient
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 
 from api.app.auth.dependencies import AuthenticatedUser, get_current_user
+from api.app.auth.webhook import get_user_or_service, require_not_frozen
 from api.app.db.engine import get_db
 from api.app.db.models import Base
 
@@ -50,6 +51,8 @@ async def client(db_session: AsyncSession):
         yield db_session
 
     app.dependency_overrides[get_current_user] = _override_user
+    app.dependency_overrides[get_user_or_service] = _override_user
+    app.dependency_overrides[require_not_frozen] = _override_user
     app.dependency_overrides[get_db] = _override_db
 
     transport = ASGITransport(app=app)

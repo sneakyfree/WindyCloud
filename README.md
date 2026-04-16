@@ -116,7 +116,76 @@ GET    /api/v1/servers/plans           Available plans + pricing (public)
 GET    /api/v1/billing/usage           Combined usage summary
 GET    /api/v1/billing/history         Billing history (from daily snapshots)
 GET    /api/v1/billing/estimate        Current period estimate
+POST   /api/v1/billing/allocate        Provision a plan (service-token, idempotent)
 ```
+
+### Identity bridge
+
+```
+POST   /api/v1/identity/link-passport             Link passport ↔ windy identity
+GET    /api/v1/identity/by-passport/{passport}    Resolve passport to identity
+```
+
+### Webhooks (inbound)
+
+```
+POST   /api/v1/webhooks/identity/created   Windy Pro → provisions a UserPlan (HMAC)
+POST   /api/v1/webhooks/passport/revoked   Eternitas → freezes plan (ES256)
+POST   /api/v1/webhooks/trust/changed      Eternitas → flushes local trust cache (HMAC)
+```
+
+## Trust API integration (Wave 4)
+
+Windy Cloud gates quota + uploads through the Eternitas Trust API. Contract
+reference is **the single source of truth** and lives with the producer:
+
+> [`/Users/thewindstorm/eternitas/docs/trust-api.md`](../eternitas/docs/trust-api.md)
+
+### What Cloud calls
+
+- `GET {ETERNITAS_URL}/api/v1/trust/{passport}` on every billing-allocate
+  where a passport is provided, and on every authed upload when the caller
+  has a passport linked via the identity bridge.
+- Responses are cached in-process for 5 minutes (or whatever
+  `cache_ttl_seconds` the response suggests, whichever is smaller).
+- Cache is invalidated proactively on `trust.changed` deliveries (see
+  `routes/webhooks.py`) so stale trust doesn't linger.
+
+### Gating rules
+
+| Signal | Result |
+|---|---|
+| `status = active` + `tier_multiplier > 0` | Upload allowed, quota = `base_tier_quota * multiplier` |
+| `status = suspended` | Upload → 403 `suspended_account` |
+| `status = revoked` | Upload → 403 `frozen_account` |
+| `band = critical` (multiplier 0.0) | Quota allocated at 0 bytes — effectively blocked |
+| No passport linked (human identity) | Base quota, multiplier 1.0, trust API **not** called |
+
+### Env vars
+
+| Var | Default | Purpose |
+|---|---|---|
+| `ETERNITAS_URL` | `http://localhost:8500` | Base URL for Trust API + webhook dispatch. See `deploy/docs/env-vars.md`. |
+| `ETERNITAS_USE_MOCK` | `false` | When `true`, `TrustClient.get_trust()` returns `None` without hitting HTTP. Use for offline dev/CI. |
+| `ETERNITAS_WEBHOOK_SECRET` | — | HMAC-SHA256 secret for verifying `X-Eternitas-Signature` on `trust.changed` + `passport.*` webhooks. Must match the `webhook_secret` Eternitas returned at platform registration. |
+
+### Running the live integration tests
+
+```bash
+# 1. Start Eternitas (postgres + redis + uvicorn)
+cd /Users/thewindstorm/eternitas && scripts/dev-start.sh
+
+# 2. Point Cloud at it + name a seeded passport
+export ETERNITAS_URL=http://localhost:8200
+export ETERNITAS_TEST_PASSPORT=ET-00001
+
+# 3. Run
+cd /Users/thewindstorm/windy-cloud
+uv run pytest api/tests/integration/test_trust_live.py -v
+```
+
+Tests auto-skip if Eternitas isn't reachable or `ETERNITAS_TEST_PASSPORT`
+isn't set, so CI against a network-isolated runner stays green.
 
 ## Architecture
 

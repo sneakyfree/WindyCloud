@@ -10,6 +10,14 @@ class Settings(BaseSettings):
     windy_pro_jwks_url: str = "https://windyword.ai/.well-known/jwks.json"
     eternitas_jwks_url: str = "https://eternitas.ai/.well-known/eternitas-keys"
 
+    # Eternitas Trust API (Wave 3/4 — passport trust-tier lookups)
+    # Default 8500 per Wave 4 spec. See deploy/docs/env-vars.md for prod.
+    eternitas_url: str = "http://localhost:8500"
+    eternitas_use_mock: bool = False  # When true, TrustClient skips HTTP
+    eternitas_webhook_secret: str = ""  # HMAC for trust.changed inbound
+    trust_cache_ttl_seconds: int = 300  # 5 min
+    trust_http_timeout_seconds: float = 3.0
+
     # R2 Storage
     r2_account_id: str = ""
     r2_access_key_id: str = ""
@@ -48,6 +56,16 @@ class Settings(BaseSettings):
     default_storage_quota: int = 524_288_000  # 500MB
     max_upload_size: int = 1_073_741_824  # 1GB
     max_servers_per_user: int = 5
+
+    # Tier quotas (bytes) — Wave 2 contract #1
+    tier_quota_free: int = 5_368_709_120       # 5 GB
+    tier_quota_pro: int = 107_374_182_400      # 100 GB
+    tier_quota_ultra: int = 1_099_511_627_776  # 1 TB
+    tier_quota_max: int = 5_497_558_138_880    # 5 TB
+
+    # Shared secrets for service-to-service calls
+    identity_webhook_secret: str = ""  # HMAC secret for /webhooks/identity/created
+    service_token: str = ""            # X-Service-Token for internal callers
 
     # Sentry
     sentry_dsn: str = ""
