@@ -79,7 +79,9 @@ async def test_usage_endpoint(client):
     assert resp.status_code == 200
     usage = resp.json()
     assert usage["used_bytes"] == 0
-    assert usage["quota_bytes"] == 524_288_000
+    # Wave 7 G18: default_storage_quota now tracks tier_quota_free (5 GB)
+    # instead of the legacy 500 MB. One number for "free tier", everywhere.
+    assert usage["quota_bytes"] == 5_368_709_120
 
     # Upload a file
     await client.post(
@@ -150,18 +152,21 @@ async def test_storage_health(client):
 
 @pytest.mark.asyncio
 async def test_storage_plans_no_auth(client):
-    """Plans endpoint should be public (no auth required)."""
+    """Plans endpoint should be public (no auth required).
+
+    Wave 7 G17: the /storage/plans tier vocab is the Wave 2 canonical
+    one — free / pro / ultra / max. The old "basic" tier is gone; a
+    user previously on "basic" got 5 GB, which matches the new "free".
+    """
     resp = await client.get("/api/v1/storage/plans")
     assert resp.status_code == 200
     plans = resp.json()["plans"]
-    assert len(plans) == 4
-    assert plans[0]["plan_id"] == "free"
+    assert [p["plan_id"] for p in plans] == ["free", "pro", "ultra", "max"]
     assert plans[0]["price_cents_per_month"] == 0
-    assert plans[1]["plan_id"] == "basic"
-    assert plans[1]["price_display"] == "$2/mo"
-    assert plans[2]["plan_id"] == "pro"
-    assert plans[3]["plan_id"] == "ultra"
-    assert plans[3]["storage_display"] == "200 GB"
+    assert plans[0]["storage_display"] == "5 GB"
+    assert plans[1]["storage_display"] == "100 GB"
+    assert plans[2]["storage_display"] == "1 TB"
+    assert plans[3]["storage_display"] == "5 TB"
 
 
 @pytest.mark.asyncio

@@ -288,31 +288,39 @@ def _format_bytes(b: int) -> str:
     return f"{b:.1f} PB"
 
 
-def _estimate_storage_cost(used_bytes: int) -> int:
-    """Estimate monthly storage cost in cents based on usage tiers.
+# --- Plan tier definitions (Wave 7 G17+G18 unified) ---
+#
+# Before this fix the codebase had THREE parallel tier vocabularies:
+#   - `PLAN_TIERS` in this file: free/basic/pro/ultra  (quotas 500MB/5GB/50GB/200GB)
+#   - `_tier_quotas()`  via config:  free/pro/ultra/max  (quotas 5GB/100GB/1TB/5TB)
+#   - `STORAGE_PLANS`   in storage.py: free/basic/pro/ultra  (500MB/5GB/50GB/200GB)
+#
+# Plus `settings.default_storage_quota = 500 MB` serving as a secret
+# fourth "free" quota used as the fallback when a user had no UserPlan
+# row. A user who arrived via /billing/plan/upgrade "basic" (5 GB) and a
+# user allocated via /billing/allocate "free" (5 GB) were on the "same"
+# tier but stored under different names. /plan/upgrade "max" 400'd.
+#
+# Everything now reads from the Wave 2 vocab: free / pro / ultra / max.
+# Placeholders below — see docs/POST_LAUNCH_TODOS.md, pricing team to
+# confirm.
 
-    DEPRECATED: this ladder (500 MB / 5 GB / 50 GB / 500 GB) is a
-    pre-Wave-2 artifact and diverges from the canonical Wave 2 tiers
-    (free 5 GB / pro 100 GB / ultra 1 TB / max 5 TB) and from the real
-    plan prices. GAP G27 in docs/GAP_ANALYSIS.md tracks full
-    replacement with the Wave 2 vocab.
+PLAN_NAMES: dict[str, str] = {
+    "free": "Free",
+    "pro": "Pro",
+    "ultra": "Ultra",
+    "max": "Max",
+}
 
-    Kept for now so existing /billing/history and /billing/estimate
-    responses don't silently change shape before the tier-unification
-    PR lands. Rough-order-of-magnitude numbers; do NOT use for actual
-    invoicing.
-    """
-    used_mb = used_bytes / (1024 * 1024)
-    if used_mb <= 500:
-        return 0
-    if used_mb <= 5120:
-        return 200  # $2
-    if used_mb <= 51200:
-        return 500  # $5
-    return 1000  # $10
+# Placeholders — pricing team owns the final values (docs/POST_LAUNCH_TODOS.md).
+PLAN_PRICES_CENTS: dict[str, int] = {
+    "free": 0,
+    "pro": 500,     # $5/mo  for 100 GB
+    "ultra": 1500,  # $15/mo for 1 TB
+    "max": 5000,    # $50/mo for 5 TB
+}
 
 
-# --- Plan tier definitions ---
 def _tier_quotas() -> dict[str, int]:
     """Wave 2 tier quotas — sourced from Settings, not hardcoded."""
     return {
@@ -323,12 +331,38 @@ def _tier_quotas() -> dict[str, int]:
     }
 
 
-PLAN_TIERS = {
-    "free": {"name": "Free", "quota_bytes": 524_288_000, "price_cents": 0},
-    "basic": {"name": "Basic", "quota_bytes": 5_368_709_120, "price_cents": 200},
-    "pro": {"name": "Pro", "quota_bytes": 53_687_091_200, "price_cents": 500},
-    "ultra": {"name": "Ultra", "quota_bytes": 214_748_364_800, "price_cents": 1000},
-}
+def _plan_tiers() -> dict[str, dict]:
+    """One canonical plan descriptor per tier. All consumers (upgrade,
+    allocate, storage_plans list, cost estimator) read from here."""
+    quotas = _tier_quotas()
+    return {
+        tier: {
+            "name": PLAN_NAMES[tier],
+            "quota_bytes": quotas[tier],
+            "price_cents": PLAN_PRICES_CENTS[tier],
+        }
+        for tier in ("free", "pro", "ultra", "max")
+    }
+
+
+# Kept as an alias for back-compat with any tests that imported PLAN_TIERS.
+PLAN_TIERS = _plan_tiers()
+
+
+def _price_cents_for_usage(used_bytes: int) -> int:
+    """Smallest plan that covers `used_bytes` — that's the month's cost."""
+    quotas = _tier_quotas()
+    # Walk tiers cheapest-to-most-expensive so we hit the smallest fit.
+    for tier in ("free", "pro", "ultra", "max"):
+        if used_bytes <= quotas[tier]:
+            return PLAN_PRICES_CENTS[tier]
+    # Over the max tier — bill the max tier (over-quota enforcement
+    # happens at the upload gate; this function is a projection).
+    return PLAN_PRICES_CENTS["max"]
+
+
+# Kept as an alias so other call sites still work. Delete once callers migrate.
+_estimate_storage_cost = _price_cents_for_usage
 
 
 class AllocateRequest(BaseModel):
@@ -464,7 +498,8 @@ async def get_plan(
     result = await db.execute(select(UserPlan).where(UserPlan.identity_id == user.identity_id))
     plan = result.scalar_one_or_none()
     plan_id = plan.plan_id if plan else "free"
-    tier = PLAN_TIERS.get(plan_id, PLAN_TIERS["free"])
+    tiers = _plan_tiers()
+    tier = tiers.get(plan_id) or tiers["free"]
     return {
         "plan_id": plan_id,
         "name": tier["name"],
@@ -482,12 +517,13 @@ async def upgrade_plan(
 ):
     """Upgrade user's storage plan. Called after Stripe payment confirmation."""
     new_plan_id = body.get("plan_id", "")
-    if new_plan_id not in PLAN_TIERS:
+    tiers = _plan_tiers()
+    if new_plan_id not in tiers:
         from fastapi import HTTPException
 
         raise HTTPException(status_code=400, detail=f"Unknown plan: {new_plan_id}")
 
-    tier = PLAN_TIERS[new_plan_id]
+    tier = tiers[new_plan_id]
     result = await db.execute(select(UserPlan).where(UserPlan.identity_id == user.identity_id))
     plan = result.scalar_one_or_none()
     if plan:

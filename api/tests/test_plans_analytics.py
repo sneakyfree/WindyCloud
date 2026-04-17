@@ -7,7 +7,7 @@ import pytest
 
 @pytest.mark.asyncio
 async def test_get_plan_default_free(client):
-    """User with no plan record gets free tier."""
+    """User with no plan record gets free tier (Wave 2 vocab: 5 GB)."""
     resp = await client.get(
         "/api/v1/billing/plan",
         headers={"Authorization": "Bearer fake"},
@@ -15,14 +15,14 @@ async def test_get_plan_default_free(client):
     assert resp.status_code == 200
     body = resp.json()
     assert body["plan_id"] == "free"
-    assert body["quota_bytes"] == 524_288_000
+    assert body["quota_bytes"] == 5_368_709_120  # 5 GB — tier_quota_free
     assert body["price_cents_per_month"] == 0
     assert "upgrade_url" in body
 
 
 @pytest.mark.asyncio
 async def test_upgrade_plan(client):
-    """Upgrading plan increases quota."""
+    """Upgrading plan increases quota (Wave 2 vocab: pro = 100 GB)."""
     resp = await client.post(
         "/api/v1/billing/plan/upgrade",
         json={"plan_id": "pro"},
@@ -30,7 +30,7 @@ async def test_upgrade_plan(client):
     )
     assert resp.status_code == 200
     assert resp.json()["plan_id"] == "pro"
-    assert resp.json()["quota_bytes"] == 53_687_091_200
+    assert resp.json()["quota_bytes"] == 107_374_182_400  # 100 GB — tier_quota_pro
 
     # Verify plan persists
     resp = await client.get(

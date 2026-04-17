@@ -288,40 +288,41 @@ async def get_usage(
     )
 
 
-STORAGE_PLANS = [
-    StoragePlan(
-        plan_id="free",
-        name="Free",
-        storage_bytes=524_288_000,
-        storage_display="500 MB",
-        price_cents_per_month=0,
-        price_display="Free",
-    ),
-    StoragePlan(
-        plan_id="basic",
-        name="Basic",
-        storage_bytes=5_368_709_120,
-        storage_display="5 GB",
-        price_cents_per_month=200,
-        price_display="$2/mo",
-    ),
-    StoragePlan(
-        plan_id="pro",
-        name="Pro",
-        storage_bytes=53_687_091_200,
-        storage_display="50 GB",
-        price_cents_per_month=500,
-        price_display="$5/mo",
-    ),
-    StoragePlan(
-        plan_id="ultra",
-        name="Ultra",
-        storage_bytes=214_748_364_800,
-        storage_display="200 GB",
-        price_cents_per_month=1000,
-        price_display="$10/mo",
-    ),
-]
+def _human_bytes(n: int) -> str:
+    # Display-helper for the public /plans endpoint.
+    for unit in ("B", "KB", "MB", "GB", "TB"):
+        if n < 1024:
+            return f"{int(n)} {unit}" if n == int(n) else f"{n:.1f} {unit}"
+        n = n / 1024
+    return f"{n:.1f} PB"
+
+
+def _storage_plans() -> list[StoragePlan]:
+    """Wave 7 G17+G18 — one vocab. Reads tier quotas from settings and
+    prices from `routes/billing.PLAN_PRICES_CENTS` so every surface
+    (upgrade, allocate, public /plans) agrees."""
+    from api.app.routes.billing import PLAN_NAMES, PLAN_PRICES_CENTS, _tier_quotas
+
+    quotas = _tier_quotas()
+    plans: list[StoragePlan] = []
+    for tier in ("free", "pro", "ultra", "max"):
+        price = PLAN_PRICES_CENTS[tier]
+        plans.append(
+            StoragePlan(
+                plan_id=tier,
+                name=PLAN_NAMES[tier],
+                storage_bytes=quotas[tier],
+                storage_display=_human_bytes(quotas[tier]),
+                price_cents_per_month=price,
+                price_display="Free" if price == 0 else f"${price/100:.0f}/mo",
+            )
+        )
+    return plans
+
+
+# Materialised at import time for back-compat — existing callers expect a
+# list literal. Any setting change before server start is honoured.
+STORAGE_PLANS = _storage_plans()
 
 
 @router.get("/breakdown")
