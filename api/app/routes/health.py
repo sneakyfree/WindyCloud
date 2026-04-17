@@ -1,4 +1,18 @@
-"""Health check and status endpoints."""
+"""Health check and status endpoints.
+
+Wave 7 G31 — `/health` and `/api/v1/status` are reachable by anyone on
+the internet. Pre-G31 they leaked deployment metadata:
+
+  - which storage backend is wired (R2 vs local-disk-fallback)
+  - which compute backend (runpod / sagemaker / none)
+  - whether AWS keys are present
+  - the Python version string via uvicorn server header (separate)
+
+All of that tells an attacker exactly what to target. This module now
+returns minimal info on the public paths and puts the detailed
+provider breakdown behind `/health/full`, which we expose only on a
+loopback ALB target-group health check path in prod.
+"""
 
 from __future__ import annotations
 
@@ -16,7 +30,6 @@ _start_time = time.monotonic()
 
 
 async def _check_db() -> bool:
-    """Check database connectivity."""
     try:
         from sqlalchemy import text
 
@@ -30,7 +43,6 @@ async def _check_db() -> bool:
 
 
 async def _check_storage() -> bool:
-    """Check storage provider health."""
     try:
         if settings.r2_configured:
             from api.app.providers.r2 import R2StorageProvider
@@ -44,7 +56,6 @@ async def _check_storage() -> bool:
 
 
 async def _check_compute() -> bool:
-    """Check compute provider health."""
     try:
         if settings.runpod_api_key:
             from api.app.providers.runpod import RunPodSTTProvider
@@ -56,7 +67,7 @@ async def _check_compute() -> bool:
             return await SageMakerSTTProvider().health()
         if settings.use_mock_providers:
             return True
-        return False  # No compute configured
+        return False
     except Exception:
         return False
 
@@ -77,12 +88,7 @@ def _compute_provider() -> str:
     return "none"
 
 
-@router.get("/health")
-async def health():
-    """Comprehensive health check with provider status and uptime."""
-    uptime = round(time.monotonic() - _start_time)
-
-    # Run health checks concurrently with 5s timeout
+async def _gather_health_checks():
     try:
         db_ok, storage_ok, compute_ok = await asyncio.wait_for(
             asyncio.gather(
@@ -93,13 +99,40 @@ async def health():
             ),
             timeout=5.0,
         )
-        # Convert exceptions to False
         db_ok = db_ok if isinstance(db_ok, bool) else False
         storage_ok = storage_ok if isinstance(storage_ok, bool) else False
         compute_ok = compute_ok if isinstance(compute_ok, bool) else False
     except asyncio.TimeoutError:
         db_ok = storage_ok = compute_ok = False
+    return db_ok, storage_ok, compute_ok
 
+
+@router.get("/health")
+async def health():
+    """Public health probe — safe to expose on the public ALB.
+
+    Returns only the overall status and uptime. Does NOT disclose which
+    storage / compute backends are wired or whether they're healthy —
+    that's deployment metadata an attacker could use to target this pod.
+    """
+    db_ok, storage_ok, _compute_ok = await _gather_health_checks()
+    overall = "ok" if db_ok and storage_ok else "degraded"
+    return {
+        "status": overall,
+        "service": "windy-cloud",
+    }
+
+
+@router.get("/health/full", include_in_schema=False)
+async def health_full():
+    """Detailed health for internal ALB target-group checks.
+
+    Expose only on an internal listener — the provider names and
+    per-backend health flags are the pieces G31 removed from the
+    public probe.
+    """
+    uptime = round(time.monotonic() - _start_time)
+    db_ok, storage_ok, compute_ok = await _gather_health_checks()
     overall = "ok" if db_ok and storage_ok else "degraded"
 
     return {
@@ -117,7 +150,11 @@ async def health():
 
 @router.get("/api/v1/status")
 async def status_endpoint():
-    """Detailed pillar status for the web portal."""
+    """Minimal public status — only pillar-on/off booleans, no backends.
+
+    Web portal uses this to know which pillars to render. The actual
+    backend behind each pillar is not a fact the public needs to know.
+    """
     storage_enabled = True
     compute_enabled = (
         bool(settings.runpod_api_key)
@@ -128,21 +165,9 @@ async def status_endpoint():
 
     return {
         "service": "windy-cloud",
-        "version": __version__,
         "pillars": {
-            "storage": {
-                "enabled": storage_enabled,
-                "provider": _storage_provider(),
-            },
-            "compute": {
-                "enabled": compute_enabled,
-                "provider": _compute_provider(),
-            },
-            "servers": {
-                "enabled": servers_enabled,
-                "provider": "aws_ec2"
-                if settings.aws_access_key_id
-                else ("mock" if settings.use_mock_providers else "none"),
-            },
+            "storage": {"enabled": storage_enabled},
+            "compute": {"enabled": compute_enabled},
+            "servers": {"enabled": servers_enabled},
         },
     }
