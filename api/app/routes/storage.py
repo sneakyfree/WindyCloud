@@ -147,7 +147,7 @@ async def list_files(
     file_type: str | None = Query(None),
     limit: int = Query(50, ge=1, le=200),
     offset: int = Query(0, ge=0),
-    user: AuthenticatedUser = Depends(get_current_user),
+    user: AuthenticatedUser = Depends(require_not_frozen),
     db: AsyncSession = Depends(get_db),
 ):
     query = select(FileRecord).where(FileRecord.identity_id == user.identity_id)
@@ -194,7 +194,7 @@ async def list_files(
 @router.get("/files/{file_id}")
 async def download_file(
     file_id: str,
-    user: AuthenticatedUser = Depends(get_current_user),
+    user: AuthenticatedUser = Depends(require_not_frozen),
     db: AsyncSession = Depends(get_db),
 ):
     result = await db.execute(
@@ -232,7 +232,7 @@ async def download_file(
 @router.delete("/files/{file_id}", response_model=DeleteResponse)
 async def delete_file(
     file_id: str,
-    user: AuthenticatedUser = Depends(get_current_user),
+    user: AuthenticatedUser = Depends(require_not_frozen),
     db: AsyncSession = Depends(get_db),
 ):
     result = await db.execute(
@@ -256,7 +256,7 @@ async def delete_file(
 @router.get("/usage", response_model=UsageResponse)
 async def get_usage(
     response: Response,
-    user: AuthenticatedUser = Depends(get_current_user),
+    user: AuthenticatedUser = Depends(require_not_frozen),
     db: AsyncSession = Depends(get_db),
 ):
     result = await db.execute(
@@ -329,7 +329,7 @@ STORAGE_PLANS = [
 
 @router.get("/breakdown")
 async def storage_breakdown(
-    user: AuthenticatedUser = Depends(get_current_user),
+    user: AuthenticatedUser = Depends(require_not_frozen),
     db: AsyncSession = Depends(get_db),
 ):
     """Per-product storage breakdown for dashboard chart."""
@@ -350,7 +350,7 @@ async def storage_breakdown(
 
 @router.get("/export")
 async def export_data(
-    user: AuthenticatedUser = Depends(get_current_user),
+    user: AuthenticatedUser = Depends(require_not_frozen),
     db: AsyncSession = Depends(get_db),
 ):
     """Package all user files into a ZIP for GDPR data export."""
