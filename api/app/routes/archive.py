@@ -14,7 +14,7 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from api.app.auth.dependencies import AuthenticatedUser, get_current_user
-from api.app.auth.webhook import get_user_or_service
+from api.app.auth.webhook import get_user_or_service, verify_service_token
 from api.app.config import settings
 from api.app.db.engine import get_db
 from api.app.db.models import FileRecord
@@ -224,19 +224,27 @@ async def archive_code_settings(
     return await _archive_upload("code-settings", file, metadata, user, db)
 
 
-@router.post("/migrate", response_model=MigrateResponse)
+@router.post(
+    "/migrate",
+    response_model=MigrateResponse,
+    dependencies=[Depends(verify_service_token)],
+)
 async def archive_migrate(
     body: MigrateRequest,
-    user: AuthenticatedUser = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
     """Hot → cold storage migration. Products call this to archive files to R2.
 
+    Service-token authenticated (X-Service-Token) — this is a product
+    backend → cloud batch operation, not a user-facing endpoint.
+    Wave 2 missed this route when switching the other /archive/*
+    endpoints to `get_user_or_service`; Wave 7 G13 completes the
+    conversion by gating it on the shared service token. Products
+    name the target identity via `body.windy_identity_id`.
+
     Accepts file metadata (not the file bytes) — products should call
     POST /api/v1/storage/upload for each file first, then call this to
     register the migration and set retention policies.
-    Alternatively, products can upload files directly to archive/{product}
-    endpoints. This endpoint handles batch metadata registration.
     """
     # Validate product
     valid_products = {v["product"] for v in ARCHIVE_TYPES.values()}
