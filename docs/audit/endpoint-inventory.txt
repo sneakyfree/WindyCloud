@@ -1,0 +1,59 @@
+METHOD | PATH | HANDLER | AUTH | DEPENDENCY_CHAIN
+-------|------|---------|------|-----------------
+GET | / | api.app.main.landing | PUBLIC | 
+GET | /api/v1/analytics/daily | api.app.routes.analytics.daily_analytics | JWT | get_current_user|<fastapi.security.http.HTTPBearer object at 0x10fac3440>|get_db
+GET | /api/v1/analytics/summary | api.app.routes.analytics.analytics_summary | JWT | get_current_user|<fastapi.security.http.HTTPBearer object at 0x10fac3440>|get_db
+POST | /api/v1/archive/agent | api.app.routes.archive.archive_agent | JWT | get_user_or_service|get_db|get_db
+POST | /api/v1/archive/chat | api.app.routes.archive.archive_chat | JWT | get_user_or_service|get_db|get_db
+POST | /api/v1/archive/code-settings | api.app.routes.archive.archive_code_settings | JWT | get_user_or_service|get_db|get_db
+POST | /api/v1/archive/mail | api.app.routes.archive.archive_mail | JWT | get_user_or_service|get_db|get_db
+POST | /api/v1/archive/migrate | api.app.routes.archive.archive_migrate | JWT | get_current_user|<fastapi.security.http.HTTPBearer object at 0x10fac3440>|get_db
+POST | /api/v1/archive/recordings | api.app.routes.archive.archive_recordings | JWT | get_user_or_service|get_db|get_db
+GET | /api/v1/archive/retrieve/{product}/{filename:path} | api.app.routes.archive.archive_retrieve | JWT | get_current_user|<fastapi.security.http.HTTPBearer object at 0x10fac3440>|get_db
+POST | /api/v1/billing/allocate | api.app.routes.billing.billing_allocate | SERVICE_TOKEN | verify_service_token|get_db
+GET | /api/v1/billing/estimate | api.app.routes.billing.billing_estimate | JWT | get_current_user|<fastapi.security.http.HTTPBearer object at 0x10fac3440>|get_db
+GET | /api/v1/billing/history | api.app.routes.billing.billing_history | JWT | get_current_user|<fastapi.security.http.HTTPBearer object at 0x10fac3440>|get_db
+GET | /api/v1/billing/plan | api.app.routes.billing.get_plan | JWT | get_current_user|<fastapi.security.http.HTTPBearer object at 0x10fac3440>|get_db
+POST | /api/v1/billing/plan/upgrade | api.app.routes.billing.upgrade_plan | JWT | get_current_user|<fastapi.security.http.HTTPBearer object at 0x10fac3440>|get_db
+GET | /api/v1/billing/summary | api.app.routes.billing.billing_summary | JWT | get_current_user|<fastapi.security.http.HTTPBearer object at 0x10fac3440>|get_db
+POST | /api/v1/billing/sync | api.app.routes.billing.billing_sync | JWT | get_current_user|<fastapi.security.http.HTTPBearer object at 0x10fac3440>|get_db
+GET | /api/v1/billing/usage | api.app.routes.billing.billing_usage | JWT | get_current_user|<fastapi.security.http.HTTPBearer object at 0x10fac3440>|get_db
+GET | /api/v1/breakdown | api.app.routes.storage.storage_breakdown | JWT | get_current_user|<fastapi.security.http.HTTPBearer object at 0x10fac3440>|get_db
+GET | /api/v1/compute/models | api.app.routes.compute.list_models | PUBLIC | 
+POST | /api/v1/compute/stt | api.app.routes.compute.transcribe | JWT | get_current_user|<fastapi.security.http.HTTPBearer object at 0x10fac3440>|get_db
+GET | /api/v1/compute/stt/{job_id} | api.app.routes.compute.get_stt_job | JWT | get_current_user|<fastapi.security.http.HTTPBearer object at 0x10fac3440>|get_db
+GET | /api/v1/compute/usage | api.app.routes.compute.compute_usage | JWT | get_current_user|<fastapi.security.http.HTTPBearer object at 0x10fac3440>|get_db
+GET | /api/v1/export | api.app.routes.storage.export_data | JWT | get_current_user|<fastapi.security.http.HTTPBearer object at 0x10fac3440>|get_db
+POST | /api/v1/export/my-data | api.app.routes.export.request_export | JWT | get_current_user|<fastapi.security.http.HTTPBearer object at 0x10fac3440>|get_db
+GET | /api/v1/export/{job_id} | api.app.routes.export.get_export_status | JWT | get_current_user|<fastapi.security.http.HTTPBearer object at 0x10fac3440>|get_db
+GET | /api/v1/files | api.app.routes.storage.list_files | JWT | get_current_user|<fastapi.security.http.HTTPBearer object at 0x10fac3440>|get_db
+GET | /api/v1/files/{file_id} | api.app.routes.storage.download_file | JWT | get_current_user|<fastapi.security.http.HTTPBearer object at 0x10fac3440>|get_db
+DELETE | /api/v1/files/{file_id} | api.app.routes.storage.delete_file | JWT | get_current_user|<fastapi.security.http.HTTPBearer object at 0x10fac3440>|get_db
+GET | /api/v1/health | api.app.routes.storage.storage_health | PUBLIC | 
+GET | /api/v1/identity/by-passport/{passport_number} | api.app.routes.identity.identity_by_passport | SERVICE_TOKEN | verify_service_token|get_db
+POST | /api/v1/identity/link-passport | api.app.routes.identity.link_passport | SERVICE_TOKEN | verify_service_token|get_db
+GET | /api/v1/plans | api.app.routes.storage.storage_plans | PUBLIC | 
+GET | /api/v1/servers | api.app.routes.servers.list_servers | JWT | get_current_user|<fastapi.security.http.HTTPBearer object at 0x10fac3440>|get_db
+POST | /api/v1/servers/create | api.app.routes.servers.create_server | JWT | get_current_user|<fastapi.security.http.HTTPBearer object at 0x10fac3440>|get_db
+POST | /api/v1/servers/deploy-fly | api.app.routes.servers.deploy_fly | JWT | get_current_user|<fastapi.security.http.HTTPBearer object at 0x10fac3440>|get_db
+GET | /api/v1/servers/plans | api.app.routes.servers.list_plans | PUBLIC | 
+GET | /api/v1/servers/{server_id} | api.app.routes.servers.get_server | JWT | get_current_user|<fastapi.security.http.HTTPBearer object at 0x10fac3440>|get_db
+DELETE | /api/v1/servers/{server_id} | api.app.routes.servers.delete_server | JWT | get_current_user|<fastapi.security.http.HTTPBearer object at 0x10fac3440>|get_db
+POST | /api/v1/servers/{server_id}/action | api.app.routes.servers.server_action | JWT | get_current_user|<fastapi.security.http.HTTPBearer object at 0x10fac3440>|get_db
+GET | /api/v1/status | api.app.routes.health.status_endpoint | PUBLIC | 
+GET | /api/v1/storage/breakdown | api.app.routes.storage.storage_breakdown | JWT | get_current_user|<fastapi.security.http.HTTPBearer object at 0x10fac3440>|get_db
+GET | /api/v1/storage/export | api.app.routes.storage.export_data | JWT | get_current_user|<fastapi.security.http.HTTPBearer object at 0x10fac3440>|get_db
+GET | /api/v1/storage/files | api.app.routes.storage.list_files | JWT | get_current_user|<fastapi.security.http.HTTPBearer object at 0x10fac3440>|get_db
+GET | /api/v1/storage/files/{file_id} | api.app.routes.storage.download_file | JWT | get_current_user|<fastapi.security.http.HTTPBearer object at 0x10fac3440>|get_db
+DELETE | /api/v1/storage/files/{file_id} | api.app.routes.storage.delete_file | JWT | get_current_user|<fastapi.security.http.HTTPBearer object at 0x10fac3440>|get_db
+GET | /api/v1/storage/health | api.app.routes.storage.storage_health | PUBLIC | 
+GET | /api/v1/storage/plans | api.app.routes.storage.storage_plans | PUBLIC | 
+POST | /api/v1/storage/upload | api.app.routes.storage.upload_file | JWT | require_not_frozen|get_current_user|<fastapi.security.http.HTTPBearer object at 0x10fac3440>|get_db|get_db
+GET | /api/v1/storage/usage | api.app.routes.storage.get_usage | JWT | get_current_user|<fastapi.security.http.HTTPBearer object at 0x10fac3440>|get_db
+GET | /api/v1/sync/status | api.app.routes.sync.sync_status | JWT | get_current_user|<fastapi.security.http.HTTPBearer object at 0x10fac3440>|get_db
+POST | /api/v1/upload | api.app.routes.storage.upload_file | JWT | require_not_frozen|get_current_user|<fastapi.security.http.HTTPBearer object at 0x10fac3440>|get_db|get_db
+GET | /api/v1/usage | api.app.routes.storage.get_usage | JWT | get_current_user|<fastapi.security.http.HTTPBearer object at 0x10fac3440>|get_db
+POST | /api/v1/webhooks/identity/created | api.app.routes.webhooks.handle_identity_created | PUBLIC | get_db
+POST | /api/v1/webhooks/passport/revoked | api.app.routes.webhooks.handle_passport_revoked | PUBLIC | get_db
+POST | /api/v1/webhooks/trust/changed | api.app.routes.webhooks.handle_trust_changed | PUBLIC | 
+GET | /health | api.app.routes.health.health | PUBLIC | 
