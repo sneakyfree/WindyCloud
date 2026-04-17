@@ -43,28 +43,78 @@ class IdentityCreatedPayload(BaseModel):
 @router.post("/identity/created", status_code=status.HTTP_201_CREATED)
 async def handle_identity_created(
     request: Request,
-    x_windy_signature: str = Header(..., alias="X-Windy-Signature"),
+    x_pro_signature: str | None = Header(None, alias="X-Pro-Signature"),
+    x_pro_timestamp: str | None = Header(None, alias="X-Pro-Timestamp"),
+    x_windy_signature: str | None = Header(None, alias="X-Windy-Signature"),
     db: AsyncSession = Depends(get_db),
 ) -> dict[str, Any]:
     """Provision a storage plan when Windy Pro creates a new identity.
 
-    HMAC-SHA256 signed body (same pattern as windy-mail's Eternitas webhook).
-    Calls allocate_plan internally so the same path is exercised as the
-    service-to-service POST /billing/allocate.
+    Wave 7 G15:
+      - Signature header is `X-Pro-Signature` (HMAC-SHA256). The old
+        name `X-Windy-Signature` is accepted for a back-compat window
+        but logged as deprecated — Eternitas reserves `X-Windy-Signature`
+        for its detached ES256 JWS ecosystem signature, so Cloud
+        interpreting it as HMAC was a naming collision waiting to fire.
+      - `X-Pro-Timestamp` (unix seconds) is now required when the new
+        header name is used; stale deliveries (> 5 min old) are rejected
+        to block replay of captured signatures.
     """
+    import time as _time
+
     if not settings.identity_webhook_secret:
         raise HTTPException(
             status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
             detail="Webhook secret not configured",
         )
+
+    # Header precedence: new name wins, old name is the deprecated fallback.
+    signature = x_pro_signature
+    using_legacy_header = False
+    if signature is None and x_windy_signature is not None:
+        signature = x_windy_signature
+        using_legacy_header = True
+        logger.warning(
+            "identity.created: caller still sending legacy X-Windy-Signature; "
+            "switch to X-Pro-Signature — Eternitas reserves the Windy name "
+            "for detached ES256 JWS."
+        )
+    if signature is None:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Missing X-Pro-Signature header",
+        )
+
     body_bytes = await request.body()
     if not verify_hmac_sha256(
-        body_bytes, x_windy_signature, settings.identity_webhook_secret
+        body_bytes, signature, settings.identity_webhook_secret
     ):
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Invalid signature",
         )
+
+    # Replay guard — only enforced on the new header path. Legacy callers
+    # can keep working during the deprecation window without a timestamp;
+    # they lose the replay protection until they migrate.
+    if not using_legacy_header:
+        if x_pro_timestamp is None:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Missing X-Pro-Timestamp header",
+            )
+        try:
+            ts = int(x_pro_timestamp)
+        except ValueError:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Invalid X-Pro-Timestamp",
+            ) from None
+        if abs(_time.time() - ts) > 300:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Stale delivery",
+            )
 
     try:
         payload = IdentityCreatedPayload(**json.loads(body_bytes))
