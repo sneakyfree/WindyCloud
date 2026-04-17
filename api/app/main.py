@@ -95,6 +95,7 @@ def create_app() -> FastAPI:
     )
 
     # Routers
+    from api.app.routes.agent_compat import router as agent_compat_router
     from api.app.routes.analytics import router as analytics_router
     from api.app.routes.archive import router as archive_router
     from api.app.routes.billing import router as billing_router
@@ -119,10 +120,12 @@ def create_app() -> FastAPI:
     app.include_router(webhooks_router, prefix="/api/v1/webhooks", tags=["webhooks"])
     app.include_router(identity_router, prefix="/api/v1/identity", tags=["identity"])
 
-    # Agent-compatible aliases — windy-agent calls /api/v1/files and /api/v1/billing/summary
-    app.include_router(
-        storage_router, prefix="/api/v1", tags=["agent-compat"], include_in_schema=False
-    )
+    # Agent-compat: the ONE endpoint windy-agent calls outside the
+    # /storage/ prefix. Pre-G16 we double-mounted the whole storage
+    # router here, shadow-exposing /upload, /usage, /export, /breakdown,
+    # /plans, /health — none of which agents called but all of which
+    # had to be remembered when adding gates. See routes/agent_compat.py.
+    app.include_router(agent_compat_router, prefix="/api/v1", include_in_schema=False)
 
     # Static files (PWA manifest, landing page, service worker)
     app.mount("/static", StaticFiles(directory=str(STATIC_DIR)), name="static")
