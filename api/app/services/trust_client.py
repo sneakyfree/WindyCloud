@@ -1,29 +1,30 @@
-"""Eternitas Trust API consumer (Wave 3/4).
+"""Eternitas Trust API consumer (Wave 3/4/7).
 
 Fetches per-passport trust data from `GET {eternitas_url}/api/v1/trust/{passport}`
-and caches the result in-process for 5 minutes (or whatever `cache_ttl_seconds`
-the response suggests, whichever is smaller). When redis lands in windy-cloud
-this cache should move there; for now it's process-local — acceptable given
-short TTL and the `trust.changed` webhook that invalidates proactively.
+and caches the result through a shared `CacheBackend` (Redis in prod,
+in-memory fallback for dev/tests — see `services/cache_backend.py`).
 
-Contract reference: /Users/thewindstorm/eternitas/docs/trust-api.md (the
-producer-side doc is the single source of truth). The real response is richer
-than the stub used in Wave 3 — see `TrustInfo.from_response` for the full
-field list.
+Wave 7 G6: prior in-process dict meant one `trust.changed` webhook only
+invalidated the worker that received it; other Fargate tasks kept
+serving stale trust until TTL. Redis gives us one authoritative cache
+the whole fleet reads and writes through; the local `invalidate()`
+call on webhook receipt now flushes for every worker at once.
+
+Contract reference: /Users/thewindstorm/eternitas/docs/trust-api.md.
 """
 
 from __future__ import annotations
 
-import asyncio
+import json
 import logging
-import time
-from dataclasses import dataclass, field
+from dataclasses import asdict, dataclass, field
 from typing import Any
 from urllib.parse import quote
 
 import httpx
 
 from api.app.config import settings
+from api.app.services.cache_backend import CacheBackend, get_cache_backend
 
 logger = logging.getLogger(__name__)
 
@@ -58,6 +59,20 @@ class TrustInfo:
     @property
     def is_active(self) -> bool:
         return self.status == "active"
+
+    def to_bytes(self) -> bytes:
+        d = asdict(self)
+        # allowed/denied_actions are tuples in-memory; JSON doesn't care but
+        # asdict leaves them as tuples → JSON serialises them as lists fine.
+        return json.dumps(d, separators=(",", ":")).encode()
+
+    @classmethod
+    def from_bytes(cls, raw: bytes) -> "TrustInfo":
+        d = json.loads(raw)
+        d["allowed_actions"] = tuple(d.get("allowed_actions") or ())
+        d["denied_actions"] = tuple(d.get("denied_actions") or ())
+        d["dimensions"] = dict(d.get("dimensions") or {})
+        return cls(**d)
 
     @classmethod
     def from_response(cls, data: dict[str, Any]) -> "TrustInfo":
@@ -96,9 +111,15 @@ class TrustInfo:
 # Client
 # ---------------------------------------------------------------------------
 
+<<<<<<< HEAD
+=======
+def _trust_cache_key(passport_number: str) -> str:
+    return f"trust:{passport_number}"
+
+>>>>>>> 3b26875 (fix(G6): Redis-backed trust cache + webhook dedup)
 
 class TrustClient:
-    """Async Eternitas Trust API client with in-memory TTL cache."""
+    """Async Eternitas Trust API client fronted by a shared CacheBackend."""
 
     def __init__(
         self,
@@ -106,32 +127,36 @@ class TrustClient:
         ttl_seconds: int | None = None,
         timeout: float | None = None,
         use_mock: bool | None = None,
+        backend: CacheBackend | None = None,
     ):
         self._base_url = (base_url or settings.eternitas_url).rstrip("/")
         self._ttl = ttl_seconds if ttl_seconds is not None else settings.trust_cache_ttl_seconds
         self._timeout = timeout if timeout is not None else settings.trust_http_timeout_seconds
-        self._use_mock = bool(use_mock if use_mock is not None else settings.eternitas_use_mock)
-        self._cache: dict[str, tuple[float, TrustInfo]] = {}
-        self._lock = asyncio.Lock()
+        self._use_mock = bool(
+            use_mock if use_mock is not None else settings.eternitas_use_mock
+        )
+        self._backend = backend or get_cache_backend()
 
     async def get_trust(self, passport_number: str) -> TrustInfo | None:
         """Return trust info for `passport_number`, or None if unknown.
 
-        Behavior:
-        - ETERNITAS_USE_MOCK=true → always returns None (unit tests swap in a stub).
-        - Unknown passport at upstream → 404 → returns None (not cached).
-        - Network / 5xx error → returns last cached value if any, else None (logged).
-        - Otherwise caches for min(ttl, response.cache_ttl_seconds).
+        Cache order:
+          1. CacheBackend (Redis in prod, in-memory in dev) — fleet-wide.
+          2. Live HTTP call to Eternitas if not cached.
+          3. Results are cached for min(ttl, response.cache_ttl_seconds).
         """
-        if not passport_number:
-            return None
-        if self._use_mock:
+        if not passport_number or self._use_mock:
             return None
 
-        now = time.monotonic()
-        cached = self._cache.get(passport_number)
-        if cached and (now - cached[0]) < self._ttl:
-            return cached[1]
+        key = _trust_cache_key(passport_number)
+
+        cached = await self._backend.get(key)
+        if cached is not None:
+            try:
+                return TrustInfo.from_bytes(cached)
+            except (json.JSONDecodeError, TypeError, KeyError) as exc:
+                logger.warning("Corrupt trust cache for %s: %s", passport_number, exc)
+                await self._backend.delete(key)
 
         # Defense in depth for GAP G21: validate-on-ingress is the primary
         # guard, but if a malformed passport somehow reaches here we
@@ -143,16 +168,12 @@ class TrustClient:
                 resp = await client.get(url)
         except (httpx.HTTPError, OSError) as exc:
             logger.warning("Trust lookup failed for %s: %s", passport_number, exc)
-            if cached:
-                return cached[1]
             return None
 
         if resp.status_code == 404:
             return None
         if resp.status_code == 429:
             logger.warning("Trust API rate-limited on %s", passport_number)
-            if cached:
-                return cached[1]
             return None
         if resp.status_code != 200:
             logger.warning(
@@ -161,23 +182,24 @@ class TrustClient:
                 resp.status_code,
                 resp.text[:200],
             )
-            if cached:
-                return cached[1]
             return None
 
         info = TrustInfo.from_response(resp.json())
-        # Store no longer than the server hint suggests.
         effective_ttl = min(self._ttl, info.cache_ttl_seconds or self._ttl)
-        async with self._lock:
-            self._cache[passport_number] = (now - (self._ttl - effective_ttl), info)
+        if effective_ttl > 0:
+            await self._backend.set(key, info.to_bytes(), effective_ttl)
         return info
 
-    def invalidate(self, passport_number: str) -> None:
-        """Drop the cached entry for a passport — call from trust.changed webhook."""
-        self._cache.pop(passport_number, None)
+    async def invalidate(self, passport_number: str) -> None:
+        """Drop the cached entry — call from the trust.changed webhook.
 
-    def clear_cache(self) -> None:
-        self._cache.clear()
+        With the Redis backend this flushes for every worker at once.
+        """
+        await self._backend.delete(_trust_cache_key(passport_number))
+
+    async def clear_cache(self) -> None:
+        # Rarely needed — used in tests.
+        await self._backend.aclose()
 
 
 # ---------------------------------------------------------------------------

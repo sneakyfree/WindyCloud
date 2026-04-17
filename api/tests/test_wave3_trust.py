@@ -39,7 +39,7 @@ class _StubTrust:
     async def get_trust(self, passport: str):
         return self.table.get(passport)
 
-    def invalidate(self, passport: str) -> None:
+    async def invalidate(self, passport: str) -> None:
         self.table.pop(passport, None)
 
 

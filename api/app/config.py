@@ -18,6 +18,11 @@ class Settings(BaseSettings):
     windy_pro_expected_issuer: str = ""  # expected `iss` for Pro tokens
     eternitas_expected_issuer: str = ""  # expected `iss` for Eternitas tokens
 
+    # Redis — shared cache + dedup for horizontally-scaled workers
+    # (Wave 7 G6). Empty = in-memory per-worker fallback (dev/tests).
+    # Prod example: redis://windy-cloud-cache.abc123.ng.0001.use1.cache.amazonaws.com:6379/0
+    redis_url: str = ""
+
     # Eternitas Trust API (Wave 3/4 — passport trust-tier lookups)
     # Default 8500 per Wave 4 spec. See deploy/docs/env-vars.md for prod.
     eternitas_url: str = "http://localhost:8500"

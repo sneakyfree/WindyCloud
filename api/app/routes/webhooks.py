@@ -455,22 +455,21 @@ class TrustChangedPayload(BaseModel):
         return self.passport_number or self.passport or ""
 
 
-# Best-effort in-memory delivery-id dedupe. A bounded set is enough given
-# Eternitas retries 3 times with a 60s max delay — a short-lived cache is fine.
-_seen_deliveries: set[str] = set()
-_SEEN_MAX = 2048
+# Delivery-id dedupe — Redis-backed when REDIS_URL is set so retries that
+# land on different Fargate workers still dedupe. Without Redis this falls
+# back to the in-memory dict in cache_backend.InMemoryCacheBackend. Either
+# way the key TTL covers Eternitas's 3-retry / 60s max retry window plus
+# generous slack.
+_DEDUPE_TTL_SECONDS = 600  # 10 min
 
 
-def _remember_delivery(delivery_id: str) -> bool:
+async def _remember_delivery(delivery_id: str) -> bool:
     """Return True if this is a new delivery, False if we've already processed it."""
-    if delivery_id in _seen_deliveries:
-        return False
-    _seen_deliveries.add(delivery_id)
-    if len(_seen_deliveries) > _SEEN_MAX:
-        # Drop ~half the oldest entries (set is unordered — good enough).
-        for d in list(_seen_deliveries)[: _SEEN_MAX // 2]:
-            _seen_deliveries.discard(d)
-    return True
+    from api.app.services.cache_backend import get_cache_backend
+
+    return await get_cache_backend().add_if_new(
+        f"webhook-delivery:{delivery_id}", _DEDUPE_TTL_SECONDS
+    )
 
 
 @router.post("/trust/changed", status_code=status.HTTP_200_OK)
@@ -521,7 +520,7 @@ async def handle_trust_changed(
         )
 
     # Idempotent on delivery id (no-op on duplicate)
-    if x_eternitas_delivery and not _remember_delivery(x_eternitas_delivery):
+    if x_eternitas_delivery and not await _remember_delivery(x_eternitas_delivery):
         return {"status": "duplicate", "delivery": x_eternitas_delivery}
 
     try:
@@ -539,7 +538,7 @@ async def handle_trust_changed(
             detail="Missing passport in payload",
         )
 
-    get_trust_client().invalidate(passport)
+    await get_trust_client().invalidate(passport)
     logger.info(
         "trust.changed invalidated passport=%s reason=%s band=%s→%s clearance=%s→%s",
         passport,
