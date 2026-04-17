@@ -14,7 +14,7 @@ from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from api.app.auth.dependencies import AuthenticatedUser, get_current_user
-from api.app.auth.webhook import require_not_frozen
+from api.app.auth.webhook import require_not_blocked_for_write, require_not_frozen
 from api.app.config import settings
 from api.app.db.engine import get_db
 from api.app.db.models import FileRecord, UserPlan
@@ -63,7 +63,7 @@ async def upload_file(
     product: str = Form("general"),
     file_type: str = Form("file"),
     metadata: str = Form("{}"),
-    user: AuthenticatedUser = Depends(require_not_frozen),
+    user: AuthenticatedUser = Depends(require_not_blocked_for_write),
     db: AsyncSession = Depends(get_db),
 ):
     async with _upload_semaphore:
