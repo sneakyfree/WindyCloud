@@ -240,6 +240,37 @@ class PassportRevokedPayload(BaseModel):
     timestamp: str | None = None
 
 
+# Wave 7 G14: per-worker in-process JTI dedup. Every Eternitas revocation
+# token must carry a unique `jti` claim; replaying the same token is a
+# no-op. This is per-worker — in the multi-worker Fargate target G6
+# moves dedup to Redis, but even the per-worker guard materially raises
+# the bar on replay attacks (an attacker who can replay must hit every
+# worker to win, and each worker rejects duplicates within one TTL).
+_seen_revocation_jtis: dict[str, float] = {}
+_SEEN_JTI_MAX = 4096
+
+
+def _remember_revocation_jti(jti: str, exp: float | None) -> bool:
+    """Return True if this is a new jti, False if it's a replay.
+
+    Evicts entries whose `exp` has already passed so the dict stays bounded.
+    """
+    import time as _time
+
+    now = _time.time()
+    # Lazy eviction.
+    if len(_seen_revocation_jtis) > _SEEN_JTI_MAX:
+        for k, v in list(_seen_revocation_jtis.items())[: _SEEN_JTI_MAX // 2]:
+            if v <= now:
+                _seen_revocation_jtis.pop(k, None)
+    if jti in _seen_revocation_jtis and _seen_revocation_jtis[jti] > now:
+        return False
+    # Default TTL if exp isn't set: 1 hour — long enough to catch the
+    # 3-retry Eternitas window, short enough to bound memory.
+    _seen_revocation_jtis[jti] = exp if exp is not None else (now + 3600)
+    return True
+
+
 @router.post("/passport/revoked", status_code=status.HTTP_200_OK)
 @crash_safe_webhook
 async def handle_passport_revoked(
@@ -248,10 +279,16 @@ async def handle_passport_revoked(
 ) -> dict[str, Any]:
     """Freeze the account tied to a revoked passport.
 
-    Verifies the ES256-signed JWT against Eternitas' JWKS
-    (`/.well-known/eternitas-keys`), then marks the matching UserPlan as
-    frozen. Upload paths read UserPlan.frozen and reject with 403
-    frozen_account.
+    Verifies the ES256-signed JWT against Eternitas' JWKS, dedupes on
+    `jti`, and marks the matching UserPlan as frozen. Upload paths read
+    UserPlan.frozen and reject with 403 frozen_account.
+
+    Replay protection (Wave 7 G14):
+      - PyJWT rejects tokens with past `exp`.
+      - Token must carry a `jti` claim.
+      - We cache seen jti's for the token's remaining lifetime (or 1h
+        default). A duplicate delivery returns 200 status=duplicate
+        instead of re-freezing, matching the trust.changed convention.
     """
     if not payload.token:
         raise HTTPException(
@@ -267,6 +304,24 @@ async def handle_passport_revoked(
             status_code=status.HTTP_403_FORBIDDEN,
             detail=f"Invalid Eternitas signature: {exc}",
         ) from exc
+
+    jti = claims.get("jti")
+    if not jti:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Token missing jti claim — required for replay protection",
+        )
+
+    exp = claims.get("exp")
+    exp_float: float | None = None
+    try:
+        exp_float = float(exp) if exp is not None else None
+    except (TypeError, ValueError):
+        exp_float = None
+
+    if not _remember_revocation_jti(str(jti), exp_float):
+        logger.info("passport.revoked: duplicate jti=%s ignored", jti)
+        return {"status": "duplicate", "jti": jti}
 
     passport = (
         claims.get("passport_number")
