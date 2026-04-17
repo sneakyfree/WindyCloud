@@ -324,6 +324,23 @@ class AllocateRequest(BaseModel):
     passport_number: str | None = None
     tier: str = "free"
 
+    @classmethod
+    def _validate_passport(cls, v: str | None) -> str | None:
+        # Late-import to keep the existing Pydantic-1-compatible class
+        # lightweight; the validator runs at request time.
+        if v is None or v == "":
+            return None
+        from api.app.utils.passport import is_valid_passport_number
+
+        if not is_valid_passport_number(v):
+            raise ValueError("Invalid passport_number format")
+        return v
+
+    # Pydantic v2 field validator
+    from pydantic import field_validator
+
+    _pv = field_validator("passport_number")(_validate_passport)
+
 
 class AllocateResponse(BaseModel):
     plan_id: str

@@ -19,6 +19,7 @@ import logging
 import time
 from dataclasses import dataclass, field
 from typing import Any
+from urllib.parse import quote
 
 import httpx
 
@@ -135,7 +136,11 @@ class TrustClient:
         if cached and (now - cached[0]) < self._ttl:
             return cached[1]
 
-        url = f"{self._base_url}/api/v1/trust/{passport_number}"
+        # Defense in depth for GAP G21: validate-on-ingress is the primary
+        # guard, but if a malformed passport somehow reaches here we
+        # percent-encode it so it can only ever be interpreted as a
+        # single path segment, never as /../ or /?query.
+        url = f"{self._base_url}/api/v1/trust/{quote(passport_number, safe='')}"
         try:
             async with httpx.AsyncClient(timeout=self._timeout) as client:
                 resp = await client.get(url)

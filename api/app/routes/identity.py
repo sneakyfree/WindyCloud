@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from fastapi import APIRouter, Depends, HTTPException, status
-from pydantic import BaseModel
+from pydantic import BaseModel, field_validator
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -11,6 +11,7 @@ from api.app.auth.webhook import verify_service_token
 from api.app.db.engine import get_db
 from api.app.db.models import IdentityBridge
 from api.app.routes.webhooks import _link_passport
+from api.app.utils.passport import is_valid_passport_number, validate_passport_number
 
 router = APIRouter()
 
@@ -20,6 +21,13 @@ class LinkPassportRequest(BaseModel):
     passport_number: str
     operator_email: str | None = None
     linked_by: str | None = None
+
+    @field_validator("passport_number")
+    @classmethod
+    def _check_passport(cls, v: str) -> str:
+        if not is_valid_passport_number(v):
+            raise ValueError("Invalid passport_number format")
+        return v
 
 
 class BridgeResponse(BaseModel):
@@ -68,6 +76,7 @@ async def identity_by_passport(
     db: AsyncSession = Depends(get_db),
 ):
     """Resolve a passport number to the Windy identity it belongs to."""
+    validate_passport_number(passport_number)
     result = await db.execute(
         select(IdentityBridge).where(IdentityBridge.passport_number == passport_number)
     )
