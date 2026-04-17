@@ -58,6 +58,12 @@ async def _run_startup_tasks() -> None:
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     """Startup and shutdown events."""
+    # G4: fail fast on partial R2 config so we don't silently try to
+    # write to a nonexistent bucket on the first upload.
+    reason = settings.r2_misconfiguration_reason
+    if reason:
+        raise RuntimeError(reason)
+
     from api.app.db.engine import init_db
 
     await init_db()
