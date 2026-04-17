@@ -37,10 +37,15 @@ if settings.sentry_dsn:
 
 
 async def _run_startup_tasks() -> None:
-    """Run retention cleanup and billing snapshots on startup."""
+    """Run retention cleanup, billing snapshots, and trust-cache warmup
+    on startup. Each is independently try/excepted so one failure
+    doesn't block the others — we want the pod serving traffic even
+    if background chores hit transient errors.
+    """
     from api.app.db.engine import async_session
     from api.app.tasks.billing_snapshot import take_billing_snapshots
     from api.app.tasks.retention_cleanup import enforce_retention_days
+    from api.app.tasks.trust_warmup import warmup_trust_cache
 
     try:
         async with async_session() as db:
@@ -53,6 +58,15 @@ async def _run_startup_tasks() -> None:
             await take_billing_snapshots(db)
     except Exception:
         logger.exception("Billing snapshot failed on startup")
+
+    # G22: warm the trust cache for known passports so the first post-
+    # deploy request per-passport doesn't have to do a synchronous
+    # Eternitas round-trip.
+    try:
+        async with async_session() as db:
+            await warmup_trust_cache(db)
+    except Exception:
+        logger.exception("Trust cache warmup failed on startup")
 
 
 @asynccontextmanager
