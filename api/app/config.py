@@ -18,11 +18,13 @@ class Settings(BaseSettings):
     trust_cache_ttl_seconds: int = 300  # 5 min
     trust_http_timeout_seconds: float = 3.0
 
-    # R2 Storage
+    # R2 Storage — no default bucket name so a partial prod config fails
+    # at startup (see r2_misconfiguration_reason below) instead of silently
+    # pointing at a nonexistent bucket.
     r2_account_id: str = ""
     r2_access_key_id: str = ""
     r2_secret_access_key: str = ""
-    r2_bucket: str = "windy-cloud-storage"
+    r2_bucket: str = ""
     r2_endpoint: str = ""
 
     # Database
@@ -90,7 +92,49 @@ class Settings(BaseSettings):
 
     @property
     def r2_configured(self) -> bool:
-        return bool(self.r2_account_id and self.r2_access_key_id)
+        """True only when *all* the pieces needed to reach R2 are present.
+
+        Bucket must be explicitly set — no default — so a partial config
+        doesn't quietly fall back to LocalDiskProvider in production. Use
+        `r2_misconfiguration_reason` to surface a specific error.
+        """
+        return bool(
+            self.r2_account_id and self.r2_access_key_id and self.r2_secret_access_key and self.r2_bucket
+        )
+
+    @property
+    def r2_misconfiguration_reason(self) -> str | None:
+        """Return a human-readable reason if R2 is partially configured.
+
+        Returns None when either fully configured or completely unset
+        (the latter falls through to LocalDiskProvider for dev). Anything
+        in between — e.g. creds set but bucket missing — should block
+        startup with the returned string.
+        """
+        any_r2 = bool(
+            self.r2_account_id
+            or self.r2_access_key_id
+            or self.r2_secret_access_key
+            or self.r2_bucket
+        )
+        if not any_r2:
+            return None
+        missing = [
+            name
+            for name, value in {
+                "R2_ACCOUNT_ID": self.r2_account_id,
+                "R2_ACCESS_KEY_ID": self.r2_access_key_id,
+                "R2_SECRET_ACCESS_KEY": self.r2_secret_access_key,
+                "R2_BUCKET": self.r2_bucket,
+            }.items()
+            if not value
+        ]
+        if not missing:
+            return None
+        return (
+            "R2 is partially configured — set all of these or unset them all "
+            f"to fall back to local disk: missing {', '.join(missing)}"
+        )
 
     @property
     def r2_endpoint_url(self) -> str:
