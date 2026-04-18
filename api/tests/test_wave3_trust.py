@@ -67,13 +67,13 @@ def trust_stub(monkeypatch):
 
 @pytest.mark.asyncio
 async def test_exceptional_bot_gets_5x_quota(client, db_session, service_token, trust_stub):
-    trust_stub.set("EPT-EXC", status="active", band="exceptional", multiplier=5.0)
+    trust_stub.set("ET-EXC", status="active", band="exceptional", multiplier=5.0)
 
     resp = await client.post(
         "/api/v1/billing/allocate",
         json={
             "windy_identity_id": "bot-exc",
-            "passport_number": "EPT-EXC",
+            "passport_number": "ET-EXC",
             "tier": "pro",
         },
         headers={"X-Service-Token": service_token},
@@ -91,13 +91,13 @@ async def test_exceptional_bot_gets_5x_quota(client, db_session, service_token, 
 
 @pytest.mark.asyncio
 async def test_critical_bot_gets_zero_quota(client, db_session, service_token, trust_stub):
-    trust_stub.set("EPT-CRIT", status="active", band="critical", multiplier=0.0)
+    trust_stub.set("ET-CRIT", status="active", band="critical", multiplier=0.0)
 
     resp = await client.post(
         "/api/v1/billing/allocate",
         json={
             "windy_identity_id": "bot-crit",
-            "passport_number": "EPT-CRIT",
+            "passport_number": "ET-CRIT",
             "tier": "pro",
         },
         headers={"X-Service-Token": service_token},
@@ -130,12 +130,12 @@ async def test_human_no_passport_base_quota(client, db_session, service_token, t
 
 @pytest.mark.asyncio
 async def test_verified_bot_2x_quota(client, service_token, trust_stub):
-    trust_stub.set("EPT-VER", status="active", band="good", multiplier=2.0)
+    trust_stub.set("ET-VER", status="active", band="good", multiplier=2.0)
     resp = await client.post(
         "/api/v1/billing/allocate",
         json={
             "windy_identity_id": "bot-ver",
-            "passport_number": "EPT-VER",
+            "passport_number": "ET-VER",
             "tier": "free",
         },
         headers={"X-Service-Token": service_token},
@@ -184,7 +184,7 @@ async def test_suspended_bot_upload_rejected(db_session, trust_stub):
     db_session.add(
         IdentityBridge(
             windy_identity_id="susp-bot",
-            passport_number="EPT-SUSP",
+            passport_number="ET-SUSP",
         )
     )
     db_session.add(
@@ -196,7 +196,7 @@ async def test_suspended_bot_upload_rejected(db_session, trust_stub):
         )
     )
     await db_session.commit()
-    trust_stub.set("EPT-SUSP", status="suspended", band="fair", multiplier=1.0)
+    trust_stub.set("ET-SUSP", status="suspended", band="fair", multiplier=1.0)
 
     resp = await _upload_with_real_gate(db_session, "susp-bot")
     assert resp.status_code == 403
@@ -208,7 +208,7 @@ async def test_revoked_bot_upload_rejected(db_session, trust_stub):
     db_session.add(
         IdentityBridge(
             windy_identity_id="rev-bot",
-            passport_number="EPT-REV",
+            passport_number="ET-REV",
         )
     )
     db_session.add(
@@ -220,7 +220,7 @@ async def test_revoked_bot_upload_rejected(db_session, trust_stub):
         )
     )
     await db_session.commit()
-    trust_stub.set("EPT-REV", status="revoked", band="critical", multiplier=0.0)
+    trust_stub.set("ET-REV", status="revoked", band="critical", multiplier=0.0)
 
     resp = await _upload_with_real_gate(db_session, "rev-bot")
     assert resp.status_code == 403
@@ -232,7 +232,7 @@ async def test_active_bot_upload_allowed(db_session, trust_stub):
     db_session.add(
         IdentityBridge(
             windy_identity_id="ok-bot",
-            passport_number="EPT-OK",
+            passport_number="ET-OK",
         )
     )
     db_session.add(
@@ -244,7 +244,7 @@ async def test_active_bot_upload_allowed(db_session, trust_stub):
         )
     )
     await db_session.commit()
-    trust_stub.set("EPT-OK", status="active", band="fair", multiplier=1.0)
+    trust_stub.set("ET-OK", status="active", band="fair", multiplier=1.0)
 
     resp = await _upload_with_real_gate(db_session, "ok-bot")
     assert resp.status_code == 200

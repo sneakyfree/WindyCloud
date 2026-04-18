@@ -39,6 +39,20 @@ class IdentityCreatedPayload(BaseModel):
     email: str | None = None
     timestamp: str | None = None
 
+    @classmethod
+    def _check_passport(cls, v: str | None) -> str | None:
+        if v is None or v == "":
+            return None
+        from api.app.utils.passport import is_valid_passport_number
+
+        if not is_valid_passport_number(v):
+            raise ValueError("Invalid passport_number format")
+        return v
+
+    from pydantic import field_validator as _fv
+
+    _pv = _fv("passport_number")(_check_passport)
+
 
 @router.post("/identity/created", status_code=status.HTTP_201_CREATED)
 async def handle_identity_created(
