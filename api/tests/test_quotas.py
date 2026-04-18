@@ -95,14 +95,19 @@ async def test_storage_health_no_auth(client):
 
 
 @pytest.mark.asyncio
-async def test_status_reflects_mock_providers(client):
-    """Status endpoint should show mock providers when enabled."""
+async def test_status_reflects_pillars_enabled(client):
+    """Status endpoint should report which pillars are enabled.
+
+    Wave 7 G31: backend provider names (local_disk / mock / r2 / aws_ec2)
+    are no longer exposed on the public status endpoint — they're
+    deployment metadata. The /health/full internal endpoint has them.
+    """
     resp = await client.get("/api/v1/status")
     assert resp.status_code == 200
     body = resp.json()
     assert body["pillars"]["storage"]["enabled"] is True
-    assert body["pillars"]["storage"]["provider"] == "local_disk"
     assert body["pillars"]["compute"]["enabled"] is True
-    assert body["pillars"]["compute"]["provider"] == "mock"
     assert body["pillars"]["servers"]["enabled"] is True
-    assert body["pillars"]["servers"]["provider"] == "mock"
+    # The provider field is intentionally NOT here anymore.
+    for pillar in body["pillars"].values():
+        assert "provider" not in pillar

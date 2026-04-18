@@ -48,13 +48,15 @@ async def test_storage_health_response_format(client):
 
 @pytest.mark.asyncio
 async def test_root_health_response_format(client):
-    """GET /health returns {status, service, version}."""
+    """GET /health returns {status, service} — G31 moved version etc. to /health/full."""
     resp = await client.get("/health")
     assert resp.status_code == 200
     body = resp.json()
     assert body["status"] == "ok"
     assert body["service"] == "windy-cloud"
-    assert "version" in body
+    # version moved to /health/full post-G31 (deployment metadata leak)
+    full = await client.get("/health/full")
+    assert "version" in full.json()
 
 
 @pytest.mark.asyncio

@@ -36,37 +36,53 @@ if settings.sentry_dsn:
         logger.warning("sentry-sdk not installed, skipping Sentry init")
 
 
-async def _run_startup_tasks() -> None:
-    """Run retention cleanup, billing snapshots, and trust-cache warmup
-    on startup. Each is independently try/excepted so one failure
-    doesn't block the others — we want the pod serving traffic even
-    if background chores hit transient errors.
+async def _run_one_startup_task(name: str, task_fn) -> bool:
+    """Run a single background task with loud failure handling (Wave 7 G33).
+
+    Pre-G33 the startup tasks caught every exception and silently
+    continued — meaning a rotated R2 credential or a flaky Postgres
+    cold-start would turn into a weeks-long silent retention-enforcement
+    outage nobody noticed.
+
+    Every failure now:
+      - Logs at ERROR with stack ("Startup task {name} failed") so the
+        pod's log stream shows it immediately.
+      - Captures to Sentry (when available) so ops paging hits before
+        anyone realises quotas haven't been enforced.
+      - Returns False so the caller can emit a metric / flip a health
+        flag.
     """
     from api.app.db.engine import async_session
+
+    try:
+        async with async_session() as db:
+            await task_fn(db)
+        return True
+    except Exception as exc:
+        logger.exception("Startup task %s failed", name)
+        try:
+            import sentry_sdk
+            sentry_sdk.capture_exception(exc)
+        except ImportError:
+            pass
+        return False
+
+
+async def _run_startup_tasks() -> None:
+    """Run retention cleanup, billing snapshots, and trust-cache warmup
+    on startup. Each is routed through `_run_one_startup_task` (G33) so
+    a flaky dependency paging Sentry instead of silently continuing.
+    """
     from api.app.tasks.billing_snapshot import take_billing_snapshots
     from api.app.tasks.retention_cleanup import enforce_retention_days
     from api.app.tasks.trust_warmup import warmup_trust_cache
 
-    try:
-        async with async_session() as db:
-            await enforce_retention_days(db)
-    except Exception:
-        logger.exception("Retention cleanup failed on startup")
-
-    try:
-        async with async_session() as db:
-            await take_billing_snapshots(db)
-    except Exception:
-        logger.exception("Billing snapshot failed on startup")
-
+    await _run_one_startup_task("retention_cleanup", enforce_retention_days)
+    await _run_one_startup_task("billing_snapshot", take_billing_snapshots)
     # G22: warm the trust cache for known passports so the first post-
     # deploy request per-passport doesn't have to do a synchronous
     # Eternitas round-trip.
-    try:
-        async with async_session() as db:
-            await warmup_trust_cache(db)
-    except Exception:
-        logger.exception("Trust cache warmup failed on startup")
+    await _run_one_startup_task("trust_warmup", warmup_trust_cache)
 
 
 @asynccontextmanager
