@@ -457,27 +457,77 @@ async def _link_passport(
     operator_email: str | None = None,
     linked_by: str | None = None,
 ) -> IdentityBridge:
-    """Idempotent upsert of a bridge row."""
+    """Idempotent upsert of a bridge row.
+
+    The old SELECT→branch→INSERT raced on concurrent calls for the same
+    identity — the live probe showed 4 of 5 parallel POSTs 500'ing with
+    IntegrityError. We now use a dialect-aware INSERT ... ON CONFLICT
+    so parallel calls converge on the same row. GAP G12.
+    """
+    values = {
+        "windy_identity_id": windy_identity_id,
+        "passport_number": passport_number,
+        "operator_email": operator_email,
+        "linked_by": linked_by,
+    }
+
+    dialect = db.bind.dialect.name if db.bind is not None else ""
+    if dialect == "postgresql":
+        from sqlalchemy.dialects.postgresql import insert as pg_insert
+
+        stmt = pg_insert(IdentityBridge).values(**values)
+        update_cols: dict[str, Any] = {
+            "passport_number": stmt.excluded.passport_number,
+        }
+        if operator_email is not None:
+            update_cols["operator_email"] = stmt.excluded.operator_email
+        if linked_by is not None:
+            update_cols["linked_by"] = stmt.excluded.linked_by
+        stmt = stmt.on_conflict_do_update(
+            index_elements=[IdentityBridge.windy_identity_id],
+            set_=update_cols,
+        )
+        await db.execute(stmt)
+    elif dialect == "sqlite":
+        from sqlalchemy.dialects.sqlite import insert as sqlite_insert
+
+        stmt = sqlite_insert(IdentityBridge).values(**values)
+        update_cols = {
+            "passport_number": stmt.excluded.passport_number,
+        }
+        if operator_email is not None:
+            update_cols["operator_email"] = stmt.excluded.operator_email
+        if linked_by is not None:
+            update_cols["linked_by"] = stmt.excluded.linked_by
+        stmt = stmt.on_conflict_do_update(
+            index_elements=[IdentityBridge.windy_identity_id],
+            set_=update_cols,
+        )
+        await db.execute(stmt)
+    else:
+        # Unsupported dialect — fall back to the pre-G12 path. Safer to
+        # race here than to ship broken SQL for a backend we don't know.
+        result = await db.execute(
+            select(IdentityBridge).where(
+                IdentityBridge.windy_identity_id == windy_identity_id
+            )
+        )
+        row = result.scalar_one_or_none()
+        if row is None:
+            db.add(IdentityBridge(**values))
+        else:
+            row.passport_number = passport_number
+            if operator_email is not None:
+                row.operator_email = operator_email
+            if linked_by is not None:
+                row.linked_by = linked_by
+
+    await db.commit()
+
+    # Read back the row so the caller gets the resolved state.
     result = await db.execute(
         select(IdentityBridge).where(
             IdentityBridge.windy_identity_id == windy_identity_id
         )
     )
-    row = result.scalar_one_or_none()
-    if row is None:
-        row = IdentityBridge(
-            windy_identity_id=windy_identity_id,
-            passport_number=passport_number,
-            operator_email=operator_email,
-            linked_by=linked_by,
-        )
-        db.add(row)
-    else:
-        row.passport_number = passport_number
-        if operator_email is not None:
-            row.operator_email = operator_email
-        if linked_by is not None:
-            row.linked_by = linked_by
-    await db.commit()
-    await db.refresh(row)
-    return row
+    return result.scalar_one()
