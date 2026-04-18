@@ -7,8 +7,6 @@ clear_cache, TrustInfo.from_response full-populated path, default-for-human.
 
 from __future__ import annotations
 
-from unittest.mock import MagicMock
-
 import httpx
 import pytest
 
@@ -19,7 +17,6 @@ from api.app.services.trust_client import (
     _reset_trust_client_for_testing,
     get_trust_client,
 )
-
 
 # ---------------------------------------------------------------------------
 # TrustInfo

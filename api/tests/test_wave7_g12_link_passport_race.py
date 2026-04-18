@@ -24,7 +24,6 @@ from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_asyn
 
 from api.app.db.models import Base, IdentityBridge
 
-
 TOKEN = "g12-svc-token"
 
 

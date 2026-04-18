@@ -8,12 +8,10 @@ Two gates must hold:
 
 from __future__ import annotations
 
-import asyncio
 import io
 import json
 
 import pytest
-from httpx import ASGITransport, AsyncClient
 
 
 @pytest.fixture

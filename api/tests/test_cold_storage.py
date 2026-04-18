@@ -6,7 +6,6 @@ import json
 
 import pytest
 
-
 # Wave 7 G13: archive_migrate now requires a service token, not a user JWT.
 MIGRATE_TOKEN = "cold-storage-test-token"
 

@@ -29,8 +29,8 @@ class _TrustDown:
 
 @pytest.fixture
 def trust_down(monkeypatch):
-    from api.app.services import trust_client as tc_mod
     from api.app.auth import webhook as wh_mod
+    from api.app.services import trust_client as tc_mod
 
     stub = _TrustDown()
     monkeypatch.setattr(tc_mod, "_trust_client", stub)

@@ -21,14 +21,12 @@ import os
 
 import httpx
 import pytest
-from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 
 from api.app.config import settings
 from api.app.db.models import Base, IdentityBridge, UserPlan
 from api.app.routes.billing import allocate_plan
 from api.app.services.trust_client import TrustClient, _reset_trust_client_for_testing
-
 
 ETERNITAS_URL = os.environ.get("ETERNITAS_URL") or settings.eternitas_url
 

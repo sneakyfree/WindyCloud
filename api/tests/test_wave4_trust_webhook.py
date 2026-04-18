@@ -12,11 +12,9 @@ import json
 import time
 
 import pytest
-from httpx import ASGITransport, AsyncClient
 
 from api.app.config import settings
 from api.app.services.trust_client import TrustInfo, get_trust_client
-
 
 WEBHOOK_SECRET = "wave4-trust-secret"
 

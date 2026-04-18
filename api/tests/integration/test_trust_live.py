@@ -38,7 +38,6 @@ from api.app.services.trust_client import (
     _reset_trust_client_for_testing,
 )
 
-
 ETERNITAS_URL = os.environ.get("ETERNITAS_URL") or settings.eternitas_url
 KNOWN_PASSPORT = os.environ.get("ETERNITAS_TEST_PASSPORT")
 UNKNOWN_PASSPORT = "ET-99999-NEVERREAL"
@@ -198,6 +197,7 @@ async def test_trust_changed_webhook_flushes_our_cache(monkeypatch):
 
     async def _db():
         from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
+
         from api.app.db.models import Base
 
         engine = create_async_engine("sqlite+aiosqlite:///:memory:")

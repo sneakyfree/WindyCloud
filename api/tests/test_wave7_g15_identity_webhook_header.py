@@ -21,7 +21,6 @@ import time
 
 import pytest
 
-
 WEBHOOK_SECRET = "g15-webhook-secret"
 
 

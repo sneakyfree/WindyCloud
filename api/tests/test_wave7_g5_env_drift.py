@@ -11,7 +11,6 @@ from pathlib import Path
 
 from api.app.config import Settings
 
-
 REPO_ROOT = Path(__file__).resolve().parents[2]
 ENV_EXAMPLE = REPO_ROOT / ".env.example"
 

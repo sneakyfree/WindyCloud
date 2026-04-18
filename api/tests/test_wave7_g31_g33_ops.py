@@ -18,10 +18,8 @@ the caller can metric it.
 from __future__ import annotations
 
 import logging
-from unittest.mock import MagicMock
 
 import pytest
-
 
 # ---------------------------------------------------------------------------
 # G31 — /health is minimal

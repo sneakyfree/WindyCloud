@@ -11,7 +11,6 @@ from sqlalchemy import select
 from api.app.db.models import IdentityBridge, UserPlan
 from api.app.services.trust_client import TrustInfo
 
-
 ALLOC_TOKEN = "wave3-service-token"
 
 
@@ -47,9 +46,9 @@ class _StubTrust:
 @pytest.fixture
 def trust_stub(monkeypatch):
     """Swap the trust-client singleton for an in-memory stub."""
-    from api.app.services import trust_client as trust_mod
     from api.app.auth import webhook as webhook_mod
     from api.app.routes import billing as billing_mod
+    from api.app.services import trust_client as trust_mod
 
     stub = _StubTrust()
     monkeypatch.setattr(trust_mod, "_trust_client", stub)

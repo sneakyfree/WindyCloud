@@ -21,7 +21,6 @@ from api.app.utils.passport import (
     validate_passport_number,
 )
 
-
 VALID_EXAMPLES = [
     # Seeded test fixtures (matches observed Eternitas seed script)
     "ET26-TEST-EXCP",

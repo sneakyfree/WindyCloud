@@ -21,7 +21,6 @@ import time
 
 import pytest
 
-
 WEBHOOK_SECRET = "g23-hmac-secret"
 
 
