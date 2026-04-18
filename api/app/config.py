@@ -10,14 +10,6 @@ class Settings(BaseSettings):
     windy_pro_jwks_url: str = "https://windyword.ai/.well-known/jwks.json"
     eternitas_jwks_url: str = "https://eternitas.ai/.well-known/eternitas-keys"
 
-    # Optional audience / issuer validation (Wave 7 G7). Empty = accept
-    # any signed token from the JWKS (pre-Wave-7 behaviour). Set these in
-    # prod to reject tokens minted for another product/audience even if
-    # signed by the same hub — prevents cross-product token confusion.
-    windy_cloud_expected_audience: str = ""       # expected `aud` claim
-    windy_pro_expected_issuer: str = ""           # expected `iss` for Pro tokens
-    eternitas_expected_issuer: str = ""           # expected `iss` for Eternitas tokens
-
     # Eternitas Trust API (Wave 3/4 — passport trust-tier lookups)
     # Default 8500 per Wave 4 spec. See deploy/docs/env-vars.md for prod.
     eternitas_url: str = "http://localhost:8500"
