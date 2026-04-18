@@ -28,7 +28,12 @@ from api.app.models.storage import (
 logger = logging.getLogger(__name__)
 router = APIRouter()
 
-# Shared upload concurrency limit with storage routes
+# Per-worker upload concurrency limit. Bounds how many archive uploads
+# one Fargate task will process concurrently; on an autoscaled fleet
+# the effective fleet-wide concurrency is `5 * N_tasks`. Edge rate
+# limits (ALB / WAF) are the right knob for fleet-wide caps; this
+# semaphore exists so one task's memory stays bounded under a burst.
+# GAP G29 tracks making the per-worker nature explicit in the name.
 _upload_semaphore = asyncio.Semaphore(5)
 
 

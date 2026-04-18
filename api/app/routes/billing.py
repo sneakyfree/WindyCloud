@@ -289,7 +289,19 @@ def _format_bytes(b: int) -> str:
 
 
 def _estimate_storage_cost(used_bytes: int) -> int:
-    """Estimate monthly storage cost in cents based on usage tiers."""
+    """Estimate monthly storage cost in cents based on usage tiers.
+
+    DEPRECATED: this ladder (500 MB / 5 GB / 50 GB / 500 GB) is a
+    pre-Wave-2 artifact and diverges from the canonical Wave 2 tiers
+    (free 5 GB / pro 100 GB / ultra 1 TB / max 5 TB) and from the real
+    plan prices. GAP G27 in docs/GAP_ANALYSIS.md tracks full
+    replacement with the Wave 2 vocab.
+
+    Kept for now so existing /billing/history and /billing/estimate
+    responses don't silently change shape before the tier-unification
+    PR lands. Rough-order-of-magnitude numbers; do NOT use for actual
+    invoicing.
+    """
     used_mb = used_bytes / (1024 * 1024)
     if used_mb <= 500:
         return 0

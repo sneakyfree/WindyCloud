@@ -32,7 +32,9 @@ from api.app.tasks.analytics import track_event
 logger = logging.getLogger(__name__)
 router = APIRouter()
 
-# Limit concurrent uploads to prevent memory exhaustion (files can be up to 1 GB)
+# Per-worker cap on concurrent uploads so a single Fargate task's memory
+# stays bounded under a burst. Fleet-wide the effective limit is
+# `5 * N_tasks`; edge rate limits handle the fleet-wide case. GAP G29.
 _upload_semaphore = asyncio.Semaphore(5)
 
 

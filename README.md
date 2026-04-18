@@ -76,6 +76,8 @@ GET    /api/v1/storage/files           List files (paginated, filterable)
 GET    /api/v1/storage/files/{id}      Download file
 DELETE /api/v1/storage/files/{id}      Delete file
 GET    /api/v1/storage/usage           Storage usage + quota
+GET    /api/v1/storage/breakdown       Per-product storage breakdown for dashboards
+GET    /api/v1/storage/export          ZIP of every file for GDPR data export
 GET    /api/v1/storage/health          Provider health (public)
 GET    /api/v1/storage/plans           Storage plans + pricing (public)
 ```
@@ -83,11 +85,13 @@ GET    /api/v1/storage/plans           Storage plans + pricing (public)
 ### Archive (product-specific)
 
 ```
-POST   /api/v1/archive/chat            Encrypted chat backups (retention support)
-POST   /api/v1/archive/mail            Mail server backups
-POST   /api/v1/archive/agent           Agent database backups
-POST   /api/v1/archive/recordings      Recording archives
-POST   /api/v1/archive/code-settings   IDE settings sync
+POST   /api/v1/archive/chat                         Encrypted chat backups (retention support)
+POST   /api/v1/archive/mail                         Mail server backups
+POST   /api/v1/archive/agent                        Agent database backups
+POST   /api/v1/archive/recordings                   Recording archives
+POST   /api/v1/archive/code-settings                IDE settings sync
+POST   /api/v1/archive/migrate                      Batch metadata registration (service-token)
+GET    /api/v1/archive/retrieve/{product}/{path}    Fetch a previously archived file
 ```
 
 ### Compute (STT)
@@ -96,27 +100,42 @@ POST   /api/v1/archive/code-settings   IDE settings sync
 POST   /api/v1/compute/stt             Transcribe audio (multipart)
 GET    /api/v1/compute/stt/{job_id}    Get job status/result
 GET    /api/v1/compute/usage           Compute usage this month
-GET    /api/v1/compute/models          Available models + pricing
+GET    /api/v1/compute/models          Available models + pricing (public)
 ```
 
 ### Servers (VPS)
 
 ```
 POST   /api/v1/servers/create          Provision server
-GET    /api/v1/servers                  List servers
+GET    /api/v1/servers                 List servers
 GET    /api/v1/servers/{id}            Server details (live status)
 POST   /api/v1/servers/{id}/action     Start / stop / reboot
 DELETE /api/v1/servers/{id}            Terminate server
+POST   /api/v1/servers/deploy-fly      Fly.io deploy orchestration
 GET    /api/v1/servers/plans           Available plans + pricing (public)
 ```
 
 ### Billing
 
 ```
-GET    /api/v1/billing/usage           Combined usage summary
+GET    /api/v1/billing/usage           Combined usage summary for the current user
 GET    /api/v1/billing/history         Billing history (from daily snapshots)
-GET    /api/v1/billing/estimate        Current period estimate
+GET    /api/v1/billing/estimate        Current period cost estimate
+GET    /api/v1/billing/summary         Agent-friendly usage summary (windy-agent)
+GET    /api/v1/billing/plan            Current user's storage plan
+POST   /api/v1/billing/plan/upgrade    Switch plan (called after Stripe success)
+POST   /api/v1/billing/sync            Service-to-service usage pull (windy-pro for Stripe)
 POST   /api/v1/billing/allocate        Provision a plan (service-token, idempotent)
+```
+
+### Analytics / sync / export
+
+```
+GET    /api/v1/analytics/daily         Daily counters for dashboards (auth'd)
+GET    /api/v1/analytics/summary       Aggregate analytics summary
+GET    /api/v1/sync/status             Product-sync state for the current user
+POST   /api/v1/export/my-data          Kick off a GDPR data-export job
+GET    /api/v1/export/{job_id}         Poll data-export job status
 ```
 
 ### Identity bridge
