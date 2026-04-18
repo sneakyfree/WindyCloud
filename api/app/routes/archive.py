@@ -14,7 +14,7 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from api.app.auth.dependencies import AuthenticatedUser, get_current_user
-from api.app.auth.webhook import get_user_or_service, verify_service_token
+from api.app.auth.webhook import get_user_or_service, require_not_frozen, verify_service_token
 from api.app.config import settings
 from api.app.db.engine import get_db
 from api.app.db.models import FileRecord
@@ -326,7 +326,7 @@ async def archive_migrate(
 async def archive_retrieve(
     product: str,
     filename: str,
-    user: AuthenticatedUser = Depends(get_current_user),
+    user: AuthenticatedUser = Depends(require_not_frozen),
     db: AsyncSession = Depends(get_db),
 ):
     """Retrieve a file from cold storage. Used when a product needs archived data back.
