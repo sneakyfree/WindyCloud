@@ -1,16 +1,30 @@
-"""Sync status endpoint — shows last backup and schedule per product."""
+"""Sync status endpoint — shows last backup and schedule per product.
+
+Wave 8 adds the post-hatch auto-backup offer endpoint:
+`POST /sync/offer-backup` is pinged by the Windy Pro Electron app once
+the user has hatched an identity and we've detected pre-existing
+recordings on disk. It queues the first backup, fires a Chat push
+notification, and is idempotent per windy_identity_id so device
+retries and cross-device hatches don't double-notify.
+"""
 
 from __future__ import annotations
 
+import logging
 from datetime import datetime, timedelta, timezone
+from typing import Any
 
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, HTTPException, status
+from pydantic import BaseModel, Field
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from api.app.auth.dependencies import AuthenticatedUser, get_current_user
 from api.app.db.engine import get_db
-from api.app.db.models import FileRecord
+from api.app.db.models import BackupOffer, FileRecord
+from api.app.services.chat_push import send_first_backup_notification
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter()
 
@@ -152,3 +166,97 @@ async def sync_status(
         )
 
     return {"products": products}
+
+
+# ---------------------------------------------------------------------------
+# POST /sync/offer-backup  (Wave 8 — grandma-ribbon auto-backup)
+# ---------------------------------------------------------------------------
+
+
+class OfferBackupRequest(BaseModel):
+    """Ping from the Windy Pro Electron app after hatch.
+
+    Indicates the user has local recordings we can claim on their
+    behalf. The endpoint is idempotent per identity, so the desktop can
+    retry freely on flaky networks without producing duplicate offers.
+    """
+
+    recording_count: int = Field(..., ge=0, le=100_000)
+    bytes_estimated: int = Field(default=0, ge=0)
+
+
+@router.post("/offer-backup", status_code=status.HTTP_200_OK)
+async def offer_backup(
+    body: OfferBackupRequest,
+    user: AuthenticatedUser = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+) -> dict[str, Any]:
+    """Queue the first-backup job and fire the Chat push notification.
+
+    Idempotent on `windy_identity_id`: a second call for the same
+    identity returns the existing offer and does **not** re-notify.
+    """
+    if body.recording_count == 0:
+        # Nothing to back up — reject so the desktop doesn't paper over
+        # its own detection bug by pinging us with a zero count.
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="recording_count must be > 0",
+        )
+
+    existing_row = await db.execute(
+        select(BackupOffer).where(BackupOffer.identity_id == user.identity_id)
+    )
+    existing = existing_row.scalar_one_or_none()
+    if existing is not None:
+        return {
+            "status": "already_offered",
+            "identity_id": existing.identity_id,
+            "recording_count": existing.recording_count,
+            "notified": existing.notification_sent,
+            "notified_at": (
+                existing.notification_sent_at.isoformat()
+                if existing.notification_sent_at
+                else None
+            ),
+        }
+
+    offer = BackupOffer(
+        identity_id=user.identity_id,
+        recording_count=body.recording_count,
+        bytes_estimated=body.bytes_estimated,
+    )
+    db.add(offer)
+    # Flush before we call out so a duplicate concurrent ping hits the
+    # PK constraint rather than sending two notifications.
+    await db.flush()
+
+    notified = False
+    try:
+        notified = await send_first_backup_notification(
+            windy_identity_id=user.identity_id,
+            recording_count=body.recording_count,
+        )
+    except Exception:
+        # send_first_backup_notification already logs + swallows every
+        # expected failure mode; a catch-all here only matters if the
+        # gateway client itself has a bug. Don't let that 500 the user's
+        # hatch ribbon.
+        logger.exception(
+            "offer_backup: unexpected error calling chat push-gateway "
+            "for identity=%s — persisting offer without notification",
+            user.identity_id,
+        )
+
+    if notified:
+        offer.notification_sent = True
+        offer.notification_sent_at = datetime.now(timezone.utc)
+
+    await db.commit()
+
+    return {
+        "status": "queued",
+        "identity_id": user.identity_id,
+        "recording_count": body.recording_count,
+        "notified": notified,
+    }

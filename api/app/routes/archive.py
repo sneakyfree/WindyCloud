@@ -8,12 +8,12 @@ import logging
 import re
 import uuid
 
-from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile, status
+from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile
 from fastapi.responses import Response
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from api.app.auth.dependencies import AuthenticatedUser, get_current_user
+from api.app.auth.dependencies import AuthenticatedUser
 from api.app.auth.webhook import get_user_or_service, require_not_frozen, verify_service_token
 from api.app.config import settings
 from api.app.db.engine import get_db

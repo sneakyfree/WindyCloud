@@ -120,8 +120,8 @@ def test_settings_plumbing_passes_values_to_validators(monkeypatch):
     """get_pro_validator / get_eternitas_validator read settings and
     pass them through. Empty settings → no enforcement; non-empty →
     constructor receives them."""
-    from api.app.config import settings
     from api.app.auth import jwks as jwks_mod
+    from api.app.config import settings
 
     monkeypatch.setattr(settings, "windy_cloud_expected_audience", "windy-cloud")
     monkeypatch.setattr(settings, "windy_pro_expected_issuer", "https://windyword.ai")

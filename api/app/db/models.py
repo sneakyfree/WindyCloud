@@ -171,6 +171,30 @@ class ExportJob(Base):
     completed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
 
 
+class BackupOffer(Base):
+    """Wave 8 — post-hatch auto-backup offer, idempotent per identity.
+
+    The desktop Electron app pings /sync/offer-backup after hatch
+    completes if it detects existing local recordings. We persist one
+    row per windy_identity_id so the offer (and the accompanying Chat
+    push notification) fires exactly once, even if the desktop retries
+    the ping or the user hatches across multiple devices.
+    """
+
+    __tablename__ = "backup_offers"
+
+    identity_id: Mapped[str] = mapped_column(String(36), primary_key=True)
+    recording_count: Mapped[int] = mapped_column(Integer, default=0)
+    bytes_estimated: Mapped[int] = mapped_column(BigInteger, default=0)
+    notification_sent: Mapped[bool] = mapped_column(Boolean, default=False)
+    notification_sent_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=lambda: datetime.now(timezone.utc)
+    )
+
+
 class ServerRecord(Base):
     """VPS server instance metadata."""
 

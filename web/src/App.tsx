@@ -2,8 +2,10 @@ import { BrowserRouter, Navigate, Route, Routes } from "react-router-dom";
 import { isLoggedIn } from "./api";
 import Layout from "./Layout";
 import Billing from "./pages/Billing";
+import CloudTour from "./pages/CloudTour";
 import Compute from "./pages/Compute";
 import Dashboard from "./pages/Dashboard";
+import DeepLink from "./pages/DeepLink";
 import Files from "./pages/Files";
 import Login from "./pages/Login";
 import NotFound from "./pages/NotFound";
@@ -20,6 +22,7 @@ export default function App() {
     <BrowserRouter>
       <Routes>
         <Route path="/login" element={<Login />} />
+        <Route path="/d/:target" element={<DeepLink />} />
         <Route
           element={
             <ProtectedRoute>
@@ -28,6 +31,7 @@ export default function App() {
           }
         >
           <Route path="/" element={<Dashboard />} />
+          <Route path="/tour" element={<CloudTour />} />
           <Route path="/files" element={<Files />} />
           <Route path="/compute" element={<Compute />} />
           <Route path="/servers" element={<Servers />} />

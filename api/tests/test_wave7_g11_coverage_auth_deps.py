@@ -7,16 +7,14 @@ path.
 
 from __future__ import annotations
 
+import jwt as pyjwt
 import pytest
 from fastapi.security import HTTPAuthorizationCredentials
-
-import jwt as pyjwt
 
 
 @pytest.mark.asyncio
 async def test_get_current_user_pro_happy(monkeypatch):
     from api.app.auth import dependencies as deps_mod
-    from api.app.auth import jwks as jwks_mod
 
     class _ProStub:
         def validate_token(self, token):
@@ -38,7 +36,6 @@ async def test_get_current_user_pro_happy(monkeypatch):
 async def test_get_current_user_falls_back_to_eternitas(monkeypatch):
     """Pro rejects → Eternitas accepts → success via the fallback branch."""
     from api.app.auth import dependencies as deps_mod
-    from api.app.auth import jwks as jwks_mod
 
     class _ProRejects:
         def validate_token(self, token):
@@ -66,7 +63,6 @@ async def test_get_current_user_401_when_both_validators_reject(monkeypatch):
     from fastapi import HTTPException
 
     from api.app.auth import dependencies as deps_mod
-    from api.app.auth import jwks as jwks_mod
 
     class _Rejects:
         def validate_token(self, token):
@@ -88,7 +84,6 @@ async def test_get_current_user_catches_unexpected_error_and_continues(monkeypat
     from fastapi import HTTPException
 
     from api.app.auth import dependencies as deps_mod
-    from api.app.auth import jwks as jwks_mod
 
     class _Explodes:
         def validate_token(self, token):

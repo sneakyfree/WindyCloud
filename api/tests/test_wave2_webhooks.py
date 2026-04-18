@@ -9,12 +9,11 @@ import time
 
 import jwt as pyjwt
 import pytest
-from cryptography.hazmat.primitives.asymmetric import ec
 from cryptography.hazmat.primitives import serialization
+from cryptography.hazmat.primitives.asymmetric import ec
 from sqlalchemy import select
 
 from api.app.db.models import IdentityBridge, UserPlan
-
 
 WEBHOOK_SECRET = "test-hmac-secret-v1"
 

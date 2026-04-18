@@ -87,6 +87,10 @@ class Settings(BaseSettings):
     identity_webhook_secret: str = ""  # HMAC secret for /webhooks/identity/created
     service_token: str = ""            # X-Service-Token for internal callers
 
+    # Windy Chat push-gateway (Wave 8 — grandma-ribbon first-backup notification)
+    chat_push_gateway_url: str = ""
+    chat_push_service_token: str = ""
+
     # Sentry
     sentry_dsn: str = ""
 

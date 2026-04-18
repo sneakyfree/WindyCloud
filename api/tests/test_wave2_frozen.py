@@ -25,10 +25,9 @@ async def test_upload_blocked_when_plan_frozen(client, db_session):
 
     # require_not_frozen is mocked by conftest for convenience — so hit
     # the production dependency directly by removing the override
-    from api.app.auth.webhook import require_not_frozen
-    from api.app.main import create_app
     from api.app.auth.dependencies import get_current_user
     from api.app.db.engine import get_db
+    from api.app.main import create_app
 
     app = create_app()
 

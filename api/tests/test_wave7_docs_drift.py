@@ -11,7 +11,6 @@ from pathlib import Path
 
 from fastapi.routing import APIRoute
 
-
 REPO_ROOT = Path(__file__).resolve().parents[2]
 README = REPO_ROOT / "README.md"
 
@@ -38,7 +37,7 @@ def _live_paths() -> set[str]:
     return {
         r.path
         for r in app.routes
-        if isinstance(r, APIRoute) and not r.include_in_schema is False
+        if isinstance(r, APIRoute) and r.include_in_schema is not False
     }
 
 

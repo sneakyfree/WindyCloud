@@ -21,18 +21,14 @@ Post-G20:
 
 from __future__ import annotations
 
-import asyncio
-
 import pytest
 from httpx import ASGITransport, AsyncClient
 
 from api.app.middleware.rate_limit import (
     DEFAULT_LIMIT_PER_MINUTE,
-    ROUTE_LIMITS,
     RateLimitMiddleware,
     limit_for_path,
 )
-
 
 # ---------------------------------------------------------------------------
 # Route → limit table semantics

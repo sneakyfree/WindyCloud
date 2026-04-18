@@ -162,6 +162,7 @@ def create_app() -> FastAPI:
     from api.app.routes.archive import router as archive_router
     from api.app.routes.billing import router as billing_router
     from api.app.routes.compute import router as compute_router
+    from api.app.routes.deeplink import router as deeplink_router
     from api.app.routes.export import router as export_router
     from api.app.routes.health import router as health_router
     from api.app.routes.identity import router as identity_router
@@ -181,6 +182,7 @@ def create_app() -> FastAPI:
     app.include_router(analytics_router, prefix="/api/v1/analytics", tags=["analytics"])
     app.include_router(webhooks_router, prefix="/api/v1/webhooks", tags=["webhooks"])
     app.include_router(identity_router, prefix="/api/v1/identity", tags=["identity"])
+    app.include_router(deeplink_router, prefix="/api/v1/deeplink", tags=["deeplink"])
 
     # Agent-compat: the ONE endpoint windy-agent calls outside the
     # /storage/ prefix. Pre-G16 we double-mounted the whole storage

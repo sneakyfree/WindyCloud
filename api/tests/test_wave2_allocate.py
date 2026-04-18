@@ -7,7 +7,6 @@ from sqlalchemy import select
 
 from api.app.db.models import UserPlan
 
-
 TOKEN = "wave2-test-service-token"
 
 
