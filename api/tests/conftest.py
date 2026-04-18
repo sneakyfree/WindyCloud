@@ -2,18 +2,35 @@
 
 from __future__ import annotations
 
-import pytest
-from httpx import ASGITransport, AsyncClient
-from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
+# --- Must run before any `api.app.*` import ---
+# The module-global engine in api/app/db/engine.py is created at import
+# time from settings.database_url, whose default is a *relative path*
+# (`sqlite+aiosqlite:///data/windy_cloud.db`). On CI runners where the
+# `data/` directory doesn't exist the first real query fails with
+# `sqlite3.OperationalError: unable to open database file`. Forcing
+# an in-memory URL here means the global engine — and every per-test
+# fixture derived from it — always lives in RAM, independent of the
+# runner's filesystem.
+import os
 
-from api.app.auth.dependencies import AuthenticatedUser, get_current_user
-from api.app.auth.webhook import (
+os.environ.setdefault("DATABASE_URL", "sqlite+aiosqlite:///:memory:")
+
+import pytest  # noqa: E402
+from httpx import ASGITransport, AsyncClient  # noqa: E402
+from sqlalchemy.ext.asyncio import (  # noqa: E402
+    AsyncSession,
+    async_sessionmaker,
+    create_async_engine,
+)
+
+from api.app.auth.dependencies import AuthenticatedUser, get_current_user  # noqa: E402
+from api.app.auth.webhook import (  # noqa: E402
     get_user_or_service,
     require_not_blocked_for_write,
     require_not_frozen,
 )
-from api.app.db.engine import get_db
-from api.app.db.models import Base
+from api.app.db.engine import get_db  # noqa: E402
+from api.app.db.models import Base  # noqa: E402
 
 TEST_USER = AuthenticatedUser(
     identity_id="test-user-001",

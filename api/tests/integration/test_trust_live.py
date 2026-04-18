@@ -110,7 +110,11 @@ async def test_cache_hit_miss_headers():
     # documented vocabulary.
     cache_headers = {r1.headers.get("X-Trust-Cache"), r2.headers.get("X-Trust-Cache")}
     assert cache_headers.issubset({"hit", "miss", None})
-    assert any(h == "hit" for h in (r1.headers.get("X-Trust-Cache"), r2.headers.get("X-Trust-Cache"))), (
+    trust_cache_values = (
+        r1.headers.get("X-Trust-Cache"),
+        r2.headers.get("X-Trust-Cache"),
+    )
+    assert any(h == "hit" for h in trust_cache_values), (
         "Expected a cache hit on the second call"
     )
 

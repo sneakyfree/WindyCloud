@@ -117,7 +117,10 @@ class Settings(BaseSettings):
         `r2_misconfiguration_reason` to surface a specific error.
         """
         return bool(
-            self.r2_account_id and self.r2_access_key_id and self.r2_secret_access_key and self.r2_bucket
+            self.r2_account_id
+            and self.r2_access_key_id
+            and self.r2_secret_access_key
+            and self.r2_bucket
         )
 
     @property
