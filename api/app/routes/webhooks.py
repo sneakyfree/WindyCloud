@@ -5,6 +5,7 @@ Wave 2 contracts #1 (identity.created) and #2 (passport.revoked).
 
 from __future__ import annotations
 
+import functools
 import json
 import logging
 from datetime import datetime, timezone
@@ -12,6 +13,7 @@ from typing import Any
 
 import jwt as pyjwt
 from fastapi import APIRouter, Depends, Header, HTTPException, Request, status
+from fastapi.responses import JSONResponse
 from pydantic import BaseModel
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -26,6 +28,51 @@ from api.app.services.trust_client import get_trust_client
 
 logger = logging.getLogger(__name__)
 router = APIRouter()
+
+
+# ---------------------------------------------------------------------------
+# Wave 7 G23 — crash-safe wrapper for webhook handlers.
+#
+# Eternitas retries webhooks 3 times, then marks the subscriber
+# auto-deactivated (docs/webhooks.md §Delivery model). A deterministic
+# code bug — say, a DB constraint we forgot to handle — would 500
+# three times, then Eternitas stops dispatching to us entirely until an
+# operator re-enables the platform. That's a production-outage-shaped
+# risk for our own bugs.
+#
+# This wrapper lets HTTPException propagate (those are intentional
+# signaling: bad signature, stale timestamp, missing field), but
+# converts any unhandled Python exception into a 200 so Eternitas
+# doesn't retry-then-deactivate us. The exception is logged at ERROR
+# with full stack + Sentry if configured, so we still see the bug.
+# ---------------------------------------------------------------------------
+
+def crash_safe_webhook(fn):
+    """Decorator: catch unhandled exceptions, log, return 200.
+
+    Intentional HTTPException (bad signature, stale timestamp, etc.)
+    still propagates so the producer sees the error.
+    """
+
+    @functools.wraps(fn)
+    async def wrapper(*args, **kwargs):
+        try:
+            return await fn(*args, **kwargs)
+        except HTTPException:
+            # Intentional signaling — let FastAPI render it.
+            raise
+        except Exception:
+            logger.exception(
+                "Unhandled exception in webhook handler %s — returning 200 to "
+                "avoid producer-side auto-deactivation. FIX THE UNDERLYING BUG.",
+                fn.__name__,
+            )
+            return JSONResponse(
+                status_code=200,
+                content={"status": "accepted_with_error"},
+            )
+
+    return wrapper
 
 
 # ---------------------------------------------------------------------------
@@ -55,6 +102,7 @@ class IdentityCreatedPayload(BaseModel):
 
 
 @router.post("/identity/created", status_code=status.HTTP_201_CREATED)
+@crash_safe_webhook
 async def handle_identity_created(
     request: Request,
     x_windy_signature: str = Header(..., alias="X-Windy-Signature"),
@@ -141,6 +189,7 @@ class PassportRevokedPayload(BaseModel):
 
 
 @router.post("/passport/revoked", status_code=status.HTTP_200_OK)
+@crash_safe_webhook
 async def handle_passport_revoked(
     payload: PassportRevokedPayload,
     db: AsyncSession = Depends(get_db),
@@ -265,6 +314,7 @@ def _remember_delivery(delivery_id: str) -> bool:
 
 
 @router.post("/trust/changed", status_code=status.HTTP_200_OK)
+@crash_safe_webhook
 async def handle_trust_changed(
     request: Request,
     x_eternitas_signature: str = Header(..., alias="X-Eternitas-Signature"),
