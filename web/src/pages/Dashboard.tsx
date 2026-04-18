@@ -15,7 +15,8 @@ import {
   Zap,
 } from "lucide-react";
 import { useEffect, useState } from "react";
-import { Link } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
+import { hasSeenCloudTour } from "../tourState";
 import {
   type ExportJobStatus,
   type FileInfo,
@@ -124,8 +125,13 @@ export default function Dashboard() {
   const [syncProducts, setSyncProducts] = useState<SyncProduct[]>([]);
   const [exportJob, setExportJob] = useState<ExportJobStatus | null>(null);
   const [exporting, setExporting] = useState(false);
+  const navigate = useNavigate();
 
   useEffect(() => {
+    if (!hasSeenCloudTour()) {
+      navigate("/tour", { replace: true });
+      return;
+    }
     getUsage().then(setUsage).catch(() => {});
     listFiles({ limit: 6 })
       .then((r) => setFiles(r.files))
@@ -139,7 +145,7 @@ export default function Dashboard() {
     getSyncStatus()
       .then((r) => setSyncProducts(r.products))
       .catch(() => {});
-  }, []);
+  }, [navigate]);
 
   const pct = usage ? usage.used_percent : 0;
   const total = usage?.used_bytes || 0;

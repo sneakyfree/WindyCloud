@@ -1,10 +1,9 @@
-import { useEffect, useState } from "react";
 import { Navigate, useParams, useSearchParams } from "react-router-dom";
 
 // Mirrors the backend allow-list in api/app/routes/deeplink.py.
 // Keeping the map here means the web app can resolve a known target
 // instantly without a round-trip, while unknown targets fall through
-// to NotFound.
+// to the dashboard.
 const WEB_PATHS: Record<string, string> = {
   dashboard: "/",
   backup: "/?action=start-backup",
@@ -26,24 +25,17 @@ function appendParams(basePath: string, extras: Record<string, string>): string 
 export default function DeepLink() {
   const { target } = useParams<{ target: string }>();
   const [search] = useSearchParams();
-  const [resolved, setResolved] = useState<string | null>(null);
-  const [unknown, setUnknown] = useState(false);
 
-  useEffect(() => {
-    if (!target || !(target in WEB_PATHS)) {
-      setUnknown(true);
-      return;
-    }
-    const extras: Record<string, string> = {};
-    for (const [key, value] of search.entries()) {
-      if (!ALLOWED_PARAMS.has(key)) continue;
-      if (!SAFE_PARAM.test(value)) continue;
-      extras[key] = value;
-    }
-    setResolved(appendParams(WEB_PATHS[target], extras));
-  }, [target, search]);
+  if (!target || !(target in WEB_PATHS)) {
+    return <Navigate to="/" replace />;
+  }
 
-  if (unknown) return <Navigate to="/" replace />;
-  if (resolved) return <Navigate to={resolved} replace />;
-  return null;
+  const extras: Record<string, string> = {};
+  for (const [key, value] of search.entries()) {
+    if (!ALLOWED_PARAMS.has(key)) continue;
+    if (!SAFE_PARAM.test(value)) continue;
+    extras[key] = value;
+  }
+
+  return <Navigate to={appendParams(WEB_PATHS[target], extras)} replace />;
 }
