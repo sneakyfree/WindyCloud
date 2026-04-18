@@ -69,11 +69,20 @@ async def lifespan(app: FastAPI):
 
 
 def create_app() -> FastAPI:
+    # Hide interactive docs + OpenAPI schema in production so the full API
+    # surface (including service-token + webhook endpoints) isn't public.
+    # Dev mode keeps them on for local exploration.
+    if settings.dev_mode:
+        openapi_kwargs: dict[str, str | None] = {}
+    else:
+        openapi_kwargs = {"openapi_url": None, "docs_url": None, "redoc_url": None}
+
     app = FastAPI(
         title="Windy Cloud",
         description="Unified cloud platform — storage, compute, and servers.",
         version=__version__,
         lifespan=lifespan,
+        **openapi_kwargs,
     )
 
     # Request logging
