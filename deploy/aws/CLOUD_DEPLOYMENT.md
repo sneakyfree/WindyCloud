@@ -203,7 +203,22 @@ docker buildx build --platform linux/amd64 \
   --push .
 ```
 
-### 5.2 Task definition skeleton
+### 5.2 Task sizing vs `max_upload_size`
+
+**Invariant:** `max_upload_size` must be substantially smaller than task
+memory. The app ships a 256 MB default against the 1024 MB Fargate task
+size below; a single legit max-sized upload then peaks at ~256 MB of
+Python bytes plus the spooled multipart buffer, well inside the headroom.
+
+If you bump task memory, you can bump `MAX_UPLOAD_SIZE` — but keep a 4×
+ratio minimum (memory ≥ 4 × max_upload_size) so concurrent uploads and
+the retention-cleanup background task don't starve each other.
+
+ALB / WAF should enforce the same ceiling at the edge via
+`client_max_body_size` (nginx sidecar) or a WAF body-size rule so
+traffic never reaches the pod if it's going to be rejected anyway.
+
+### 5.3 Task definition skeleton
 
 ```json
 {
@@ -255,7 +270,7 @@ docker buildx build --platform linux/amd64 \
 }
 ```
 
-### 5.3 Service + autoscaling
+### 5.4 Service + autoscaling
 
 ```bash
 aws ecs create-service \
@@ -291,7 +306,7 @@ aws application-autoscaling put-scaling-policy \
   }'
 ```
 
-### 5.4 ALB + TLS + WAF
+### 5.5 ALB + TLS + WAF
 
 - Target group health check: `GET /health`, 200, interval 30s, threshold 2.
 - Listener rules:

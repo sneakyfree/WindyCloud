@@ -53,8 +53,12 @@ class Settings(BaseSettings):
     cors_origins: str = "https://windyword.ai,https://windycloud.com"
 
     # Quotas
-    default_storage_quota: int = 524_288_000  # 500MB
-    max_upload_size: int = 1_073_741_824  # 1GB
+    default_storage_quota: int = 524_288_000  # 500 MB
+    # Per-upload size ceiling. Must sit well under Fargate task memory
+    # (CLOUD_DEPLOYMENT.md §5.2 provisions 1024 MB) so a single legit
+    # max-sized upload can't OOM a worker. ALB / WAF should enforce the
+    # same limit at the edge. Override per-environment via MAX_UPLOAD_SIZE.
+    max_upload_size: int = 268_435_456  # 256 MB
     max_servers_per_user: int = 5
 
     # Tier quotas (bytes) — Wave 2 contract #1
