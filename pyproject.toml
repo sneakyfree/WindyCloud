@@ -49,6 +49,13 @@ select = ["E", "F", "I", "W"]
 [tool.pytest.ini_options]
 asyncio_mode = "auto"
 testpaths = ["api/tests"]
+# Default run excludes wave11 hardening probes — they re-ran under
+# `pytest -m wave11` only. Keeps CI from paying for adversarial probes
+# that mutate global settings.default_storage_quota.
+addopts = "-m 'not wave11'"
+markers = [
+    "wave11: adversarial hardening probes; run explicitly with -m wave11",
+]
 
 [dependency-groups]
 dev = [
