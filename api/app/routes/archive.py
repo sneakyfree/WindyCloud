@@ -24,6 +24,7 @@ from api.app.models.storage import (
     MigrateResponse,
     MigrateResult,
 )
+from api.app.utils.upload import read_bounded
 
 logger = logging.getLogger(__name__)
 router = APIRouter()
@@ -120,12 +121,8 @@ async def _do_archive_upload(
     product = config["product"]
     file_type = config["type"]
 
-    data = await file.read()
-    if len(data) > settings.max_upload_size:
-        raise HTTPException(
-            status_code=status.HTTP_413_CONTENT_TOO_LARGE,
-            detail=f"File exceeds maximum size of {settings.max_upload_size} bytes",
-        )
+    # GAP G2 — bounded chunked read, 413 on overflow before allocating.
+    data = await read_bounded(file, settings.max_upload_size)
 
     try:
         extra = json.loads(metadata) if metadata else {}

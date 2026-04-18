@@ -18,6 +18,7 @@ from api.app.auth.webhook import require_not_frozen
 from api.app.config import settings
 from api.app.db.engine import get_db
 from api.app.db.models import FileRecord, UserPlan
+from api.app.utils.upload import read_bounded
 from api.app.models.storage import (
     DeleteResponse,
     FileInfo,
@@ -80,12 +81,8 @@ async def _do_upload(
     user: AuthenticatedUser,
     db: AsyncSession,
 ) -> UploadResponse:
-    data = await file.read()
-    if len(data) > settings.max_upload_size:
-        raise HTTPException(
-            status_code=status.HTTP_413_CONTENT_TOO_LARGE,
-            detail=f"File exceeds maximum size of {settings.max_upload_size} bytes",
-        )
+    # Chunked read — raises 413 mid-stream if max_upload_size is exceeded.
+    data = await read_bounded(file, settings.max_upload_size)
 
     # Get user's plan quota (or fall back to global default)
     plan_result = await db.execute(select(UserPlan).where(UserPlan.identity_id == user.identity_id))
