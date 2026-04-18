@@ -63,7 +63,11 @@ class Settings(BaseSettings):
     cors_origins: str = "https://windyword.ai,https://windycloud.com"
 
     # Quotas
-    default_storage_quota: int = 524_288_000  # 500 MB
+    # Pre-Wave-7 this was 500 MB while `tier_quota_free` was 5 GB — two
+    # sources of truth for "free tier" that silently disagreed. Now it
+    # tracks `tier_quota_free` by default; override only if you actively
+    # want the un-provisioned fallback to differ from the free-tier plan.
+    default_storage_quota: int = 5_368_709_120  # 5 GB, matches tier_quota_free
     # Per-upload size ceiling. Must sit well under Fargate task memory
     # (CLOUD_DEPLOYMENT.md §5.2 provisions 1024 MB) so a single legit
     # max-sized upload can't OOM a worker. ALB / WAF should enforce the
@@ -71,7 +75,9 @@ class Settings(BaseSettings):
     max_upload_size: int = 268_435_456  # 256 MB
     max_servers_per_user: int = 5
 
-    # Tier quotas (bytes) — Wave 2 contract #1
+    # Tier quotas (bytes) — Wave 2 contract #1. The canonical vocab:
+    # free / pro / ultra / max. `PLAN_TIERS` in routes/billing.py reads
+    # from these.
     tier_quota_free: int = 5_368_709_120       # 5 GB
     tier_quota_pro: int = 107_374_182_400      # 100 GB
     tier_quota_ultra: int = 1_099_511_627_776  # 1 TB
