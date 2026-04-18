@@ -81,9 +81,7 @@ def test_shadow_endpoints_are_gone():
         "/api/v1/plans",
         "/api/v1/health",
     ):
-        assert gone not in live_paths, (
-            f"{gone} is still mounted — the G16 double-mount regressed."
-        )
+        assert gone not in live_paths, f"{gone} is still mounted — the G16 double-mount regressed."
 
 
 @pytest.mark.asyncio

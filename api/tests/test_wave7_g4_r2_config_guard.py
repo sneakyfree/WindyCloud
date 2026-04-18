@@ -86,6 +86,5 @@ def test_default_bucket_no_longer_present():
     prod bucket 'windy-cloud-storage-prod'. Default must now be empty."""
     s = _s()
     assert s.r2_bucket == "", (
-        "r2_bucket must default to '' so partial configs are caught; was "
-        f"{s.r2_bucket!r}"
+        f"r2_bucket must default to '' so partial configs are caught; was {s.r2_bucket!r}"
     )

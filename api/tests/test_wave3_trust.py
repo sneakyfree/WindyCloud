@@ -64,6 +64,7 @@ def trust_stub(monkeypatch):
 # Allocate multipliers
 # ---------------------------------------------------------------------------
 
+
 @pytest.mark.asyncio
 async def test_exceptional_bot_gets_5x_quota(client, db_session, service_token, trust_stub):
     trust_stub.set("ET-EXC", status="active", band="exceptional", multiplier=5.0)
@@ -82,9 +83,9 @@ async def test_exceptional_bot_gets_5x_quota(client, db_session, service_token, 
     # pro base = 100 GB; multiplier 5 → 500 GB
     assert body["quota_bytes"] == 107_374_182_400 * 5
 
-    plan = (await db_session.execute(
-        select(UserPlan).where(UserPlan.identity_id == "bot-exc")
-    )).scalar_one()
+    plan = (
+        await db_session.execute(select(UserPlan).where(UserPlan.identity_id == "bot-exc"))
+    ).scalar_one()
     assert plan.trust_multiplier_at_allocation == 5.0
 
 
@@ -104,9 +105,9 @@ async def test_critical_bot_gets_zero_quota(client, db_session, service_token, t
     assert resp.status_code == 200
     assert resp.json()["quota_bytes"] == 0
 
-    plan = (await db_session.execute(
-        select(UserPlan).where(UserPlan.identity_id == "bot-crit")
-    )).scalar_one()
+    plan = (
+        await db_session.execute(select(UserPlan).where(UserPlan.identity_id == "bot-crit"))
+    ).scalar_one()
     assert plan.trust_multiplier_at_allocation == 0.0
 
 
@@ -121,9 +122,9 @@ async def test_human_no_passport_base_quota(client, db_session, service_token, t
     assert resp.status_code == 200
     assert resp.json()["quota_bytes"] == 107_374_182_400  # 100 GB, un-multiplied
 
-    plan = (await db_session.execute(
-        select(UserPlan).where(UserPlan.identity_id == "human-1")
-    )).scalar_one()
+    plan = (
+        await db_session.execute(select(UserPlan).where(UserPlan.identity_id == "human-1"))
+    ).scalar_one()
     assert plan.trust_multiplier_at_allocation == 1.0
 
 
@@ -146,6 +147,7 @@ async def test_verified_bot_2x_quota(client, service_token, trust_stub):
 # ---------------------------------------------------------------------------
 # Upload gate
 # ---------------------------------------------------------------------------
+
 
 async def _upload_with_real_gate(db_session, identity_id: str):
     """Bypass the conftest auth override so the real require_not_frozen runs."""

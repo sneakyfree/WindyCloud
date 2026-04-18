@@ -26,6 +26,7 @@ from fastapi import HTTPException
 # auth/jwks.py
 # ---------------------------------------------------------------------------
 
+
 def _es256_keypair():
     priv = ec.generate_private_key(ec.SECP256R1())
     priv_pem = priv.private_bytes(
@@ -114,17 +115,27 @@ def test_extract_identity_id_priority():
     from api.app.auth.jwks import extract_identity_id
 
     # windy_identity_id wins
-    assert extract_identity_id({
-        "windy_identity_id": "id-1",
-        "passport_number": "ET-2",
-        "sub": "sub-3",
-    }) == "id-1"
+    assert (
+        extract_identity_id(
+            {
+                "windy_identity_id": "id-1",
+                "passport_number": "ET-2",
+                "sub": "sub-3",
+            }
+        )
+        == "id-1"
+    )
 
     # passport_number next
-    assert extract_identity_id({
-        "passport_number": "ET-2",
-        "sub": "sub-3",
-    }) == "ET-2"
+    assert (
+        extract_identity_id(
+            {
+                "passport_number": "ET-2",
+                "sub": "sub-3",
+            }
+        )
+        == "ET-2"
+    )
 
     # sub fallback
     assert extract_identity_id({"sub": "sub-3"}) == "sub-3"
@@ -133,6 +144,7 @@ def test_extract_identity_id_priority():
 # ---------------------------------------------------------------------------
 # auth/webhook.py — verify_hmac_sha256 edge cases
 # ---------------------------------------------------------------------------
+
 
 def test_verify_hmac_empty_secret_returns_false():
     from api.app.auth.webhook import verify_hmac_sha256
@@ -165,6 +177,7 @@ def test_verify_hmac_accepts_sha256_prefix():
 # ---------------------------------------------------------------------------
 # auth/webhook.py — verify_identity_webhook (the dep form)
 # ---------------------------------------------------------------------------
+
 
 @pytest.mark.asyncio
 async def test_verify_identity_webhook_503_when_secret_unset(monkeypatch):
@@ -220,6 +233,7 @@ async def test_verify_identity_webhook_returns_body_on_valid_sig(monkeypatch):
 # auth/webhook.py — verify_service_token
 # ---------------------------------------------------------------------------
 
+
 def test_verify_service_token_rejects_missing_and_wrong(monkeypatch):
     from api.app.auth.webhook import verify_service_token
     from api.app.config import settings
@@ -249,6 +263,7 @@ def test_verify_service_token_accepts_match(monkeypatch):
 # auth/webhook.py — _raise_if_blocked / require_not_frozen
 # ---------------------------------------------------------------------------
 
+
 @pytest.mark.asyncio
 async def test_raise_if_blocked_passes_when_no_plan(db_session):
     """No UserPlan row → not frozen, no bridge → skip trust, no raise."""
@@ -262,12 +277,15 @@ async def test_raise_if_blocked_403_when_plan_frozen(db_session):
     from api.app.auth.webhook import _raise_if_blocked
     from api.app.db.models import UserPlan
 
-    db_session.add(UserPlan(
-        identity_id="frozen-cov",
-        plan_id="pro", tier="pro",
-        quota_bytes=1024,
-        frozen=True,
-    ))
+    db_session.add(
+        UserPlan(
+            identity_id="frozen-cov",
+            plan_id="pro",
+            tier="pro",
+            quota_bytes=1024,
+            frozen=True,
+        )
+    )
     await db_session.commit()
 
     with pytest.raises(HTTPException) as exc:
@@ -282,23 +300,30 @@ async def test_raise_if_blocked_suspended_branch(db_session, monkeypatch):
     from api.app.db.models import IdentityBridge, UserPlan
     from api.app.services.trust_client import TrustInfo
 
-    db_session.add(UserPlan(
-        identity_id="suspect", plan_id="pro", tier="pro", quota_bytes=1024,
-    ))
-    db_session.add(IdentityBridge(
-        windy_identity_id="suspect", passport_number="ET-SUSP",
-    ))
+    db_session.add(
+        UserPlan(
+            identity_id="suspect",
+            plan_id="pro",
+            tier="pro",
+            quota_bytes=1024,
+        )
+    )
+    db_session.add(
+        IdentityBridge(
+            windy_identity_id="suspect",
+            passport_number="ET-SUSP",
+        )
+    )
     await db_session.commit()
 
-    suspended = TrustInfo(
-        passport_number="ET-SUSP", status="suspended", tier_multiplier=1.0
-    )
+    suspended = TrustInfo(passport_number="ET-SUSP", status="suspended", tier_multiplier=1.0)
 
     class _Stub:
         async def get_trust(self, p):
             return suspended
 
     from api.app.services import trust_client as tc_mod
+
     monkeypatch.setattr(tc_mod, "get_trust_client", lambda: _Stub())
 
     with pytest.raises(HTTPException) as exc:
@@ -313,23 +338,30 @@ async def test_raise_if_blocked_revoked_branch(db_session, monkeypatch):
     from api.app.db.models import IdentityBridge, UserPlan
     from api.app.services.trust_client import TrustInfo
 
-    db_session.add(UserPlan(
-        identity_id="revoker", plan_id="pro", tier="pro", quota_bytes=1024,
-    ))
-    db_session.add(IdentityBridge(
-        windy_identity_id="revoker", passport_number="ET-REV",
-    ))
+    db_session.add(
+        UserPlan(
+            identity_id="revoker",
+            plan_id="pro",
+            tier="pro",
+            quota_bytes=1024,
+        )
+    )
+    db_session.add(
+        IdentityBridge(
+            windy_identity_id="revoker",
+            passport_number="ET-REV",
+        )
+    )
     await db_session.commit()
 
-    revoked = TrustInfo(
-        passport_number="ET-REV", status="revoked", tier_multiplier=0.0
-    )
+    revoked = TrustInfo(passport_number="ET-REV", status="revoked", tier_multiplier=0.0)
 
     class _Stub:
         async def get_trust(self, p):
             return revoked
 
     from api.app.services import trust_client as tc_mod
+
     monkeypatch.setattr(tc_mod, "get_trust_client", lambda: _Stub())
 
     with pytest.raises(HTTPException) as exc:
@@ -344,12 +376,20 @@ async def test_raise_if_blocked_trust_none_passes(db_session, monkeypatch):
     from api.app.auth.webhook import _raise_if_blocked
     from api.app.db.models import IdentityBridge, UserPlan
 
-    db_session.add(UserPlan(
-        identity_id="opennet", plan_id="pro", tier="pro", quota_bytes=1024,
-    ))
-    db_session.add(IdentityBridge(
-        windy_identity_id="opennet", passport_number="ET-OPEN",
-    ))
+    db_session.add(
+        UserPlan(
+            identity_id="opennet",
+            plan_id="pro",
+            tier="pro",
+            quota_bytes=1024,
+        )
+    )
+    db_session.add(
+        IdentityBridge(
+            windy_identity_id="opennet",
+            passport_number="ET-OPEN",
+        )
+    )
     await db_session.commit()
 
     class _Stub:
@@ -357,6 +397,7 @@ async def test_raise_if_blocked_trust_none_passes(db_session, monkeypatch):
             return None
 
     from api.app.services import trust_client as tc_mod
+
     monkeypatch.setattr(tc_mod, "get_trust_client", lambda: _Stub())
 
     # Must not raise — fail-open on upstream unavailable.

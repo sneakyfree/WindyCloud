@@ -84,9 +84,7 @@ async def test_unhandled_exception_returns_200(monkeypatch, client, hmac_secret,
 
 
 @pytest.mark.asyncio
-async def test_unhandled_exception_in_trust_changed_returns_200(
-    monkeypatch, client, caplog
-):
+async def test_unhandled_exception_in_trust_changed_returns_200(monkeypatch, client, caplog):
     from api.app.config import settings
 
     monkeypatch.setattr(settings, "eternitas_webhook_secret", "trust-secret-g23")
@@ -102,10 +100,12 @@ async def test_unhandled_exception_in_trust_changed_returns_200(
 
     monkeypatch.setattr(wh_mod, "get_trust_client", lambda: _BrokenClient())
 
-    body = json.dumps({
-        "event": "trust.changed",
-        "passport_number": "ET-BROKEN",
-    }).encode()
+    body = json.dumps(
+        {
+            "event": "trust.changed",
+            "passport_number": "ET-BROKEN",
+        }
+    ).encode()
     sig = "sha256=" + hmac.new(b"trust-secret-g23", body, hashlib.sha256).hexdigest()
 
     with caplog.at_level(logging.ERROR, logger=wh_mod.__name__):

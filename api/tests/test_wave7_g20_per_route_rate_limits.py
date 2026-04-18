@@ -34,6 +34,7 @@ from api.app.middleware.rate_limit import (
 # Route → limit table semantics
 # ---------------------------------------------------------------------------
 
+
 def test_webhook_paths_are_exempt():
     for path in (
         "/api/v1/webhooks/identity/created",
@@ -69,6 +70,7 @@ def test_health_paths_never_even_enter_the_table():
 # ---------------------------------------------------------------------------
 # Middleware behaviour end-to-end
 # ---------------------------------------------------------------------------
+
 
 def _make_app_with_middleware(rpm: int = DEFAULT_LIMIT_PER_MINUTE):
     """Build a bare FastAPI app with just the rate-limit middleware and

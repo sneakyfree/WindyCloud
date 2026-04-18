@@ -19,14 +19,14 @@ README = REPO_ROOT / "README.md"
 # Keep this list narrow — everything here is a judgment call that
 # another reviewer should be able to verify quickly.
 _EXEMPT = {
-    "/",                                  # Landing page (not an API surface)
-    "/health",                            # Mentioned in running-locally section
-    "/api/v1/status",                     # Mentioned in running-locally section
-    "/health/full",                       # Internal-only (post-G31)
+    "/",  # Landing page (not an API surface)
+    "/health",  # Mentioned in running-locally section
+    "/api/v1/status",  # Mentioned in running-locally section
+    "/health/full",  # Internal-only (post-G31)
     "/api/v1/webhooks/identity/created",  # In the "Webhooks (inbound)" block
     "/api/v1/webhooks/passport/revoked",
     "/api/v1/webhooks/trust/changed",
-    "/api/v1/identity/link-passport",     # In the "Identity bridge" block
+    "/api/v1/identity/link-passport",  # In the "Identity bridge" block
 }
 
 
@@ -35,9 +35,7 @@ def _live_paths() -> set[str]:
 
     app = create_app()
     return {
-        r.path
-        for r in app.routes
-        if isinstance(r, APIRoute) and r.include_in_schema is not False
+        r.path for r in app.routes if isinstance(r, APIRoute) and r.include_in_schema is not False
     }
 
 

@@ -31,9 +31,9 @@ async def test_allocate_creates_plan(client, db_session, service_token):
     assert body["quota_bytes"] == 5_368_709_120
     assert body["identity_id"] == "id-free-1"
 
-    row = (await db_session.execute(
-        select(UserPlan).where(UserPlan.identity_id == "id-free-1")
-    )).scalar_one()
+    row = (
+        await db_session.execute(select(UserPlan).where(UserPlan.identity_id == "id-free-1"))
+    ).scalar_one()
     assert row.tier == "free"
     assert row.frozen is False
 
@@ -49,10 +49,10 @@ async def test_allocate_is_idempotent(client, db_session, service_token):
         assert resp.status_code == 200
 
     rows = (
-        await db_session.execute(
-            select(UserPlan).where(UserPlan.identity_id == "id-pro-1")
-        )
-    ).scalars().all()
+        (await db_session.execute(select(UserPlan).where(UserPlan.identity_id == "id-pro-1")))
+        .scalars()
+        .all()
+    )
     assert len(rows) == 1
     assert rows[0].tier == "pro"
     assert rows[0].quota_bytes == 107_374_182_400

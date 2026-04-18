@@ -62,9 +62,7 @@ def verify_service_token(
 ) -> bool:
     """FastAPI dependency: constant-time check against settings.service_token."""
     expected = settings.service_token or ""
-    if not expected or not secrets.compare_digest(
-        x_service_token.encode(), expected.encode()
-    ):
+    if not expected or not secrets.compare_digest(x_service_token.encode(), expected.encode()):
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Invalid or missing service token",
@@ -85,9 +83,7 @@ async def get_user_or_service(
     service_token = request.headers.get("X-Service-Token")
     if service_token:
         expected = settings.service_token or ""
-        if not expected or not secrets.compare_digest(
-            service_token.encode(), expected.encode()
-        ):
+        if not expected or not secrets.compare_digest(service_token.encode(), expected.encode()):
             raise HTTPException(
                 status_code=status.HTTP_401_UNAUTHORIZED,
                 detail="Invalid service token",

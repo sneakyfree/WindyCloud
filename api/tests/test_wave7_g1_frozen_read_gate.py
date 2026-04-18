@@ -74,13 +74,13 @@ async def frozen_client(db_session):
 
 
 READ_ROUTES = [
-    ("GET",    "/api/v1/storage/files"),
-    ("GET",    "/api/v1/storage/files/frz-file-1"),
-    ("GET",    "/api/v1/storage/usage"),
-    ("GET",    "/api/v1/storage/breakdown"),
-    ("GET",    "/api/v1/storage/export"),
+    ("GET", "/api/v1/storage/files"),
+    ("GET", "/api/v1/storage/files/frz-file-1"),
+    ("GET", "/api/v1/storage/usage"),
+    ("GET", "/api/v1/storage/breakdown"),
+    ("GET", "/api/v1/storage/export"),
     ("DELETE", "/api/v1/storage/files/frz-file-1"),
-    ("GET",    "/api/v1/archive/retrieve/general/secret.txt"),
+    ("GET", "/api/v1/archive/retrieve/general/secret.txt"),
 ]
 
 

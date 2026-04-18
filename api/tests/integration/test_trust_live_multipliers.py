@@ -88,6 +88,7 @@ def live_trust_client(monkeypatch):
 # Per-passport: confirm bands match the seed, then allocate + verify quota
 # ---------------------------------------------------------------------------
 
+
 @pytest.mark.asyncio
 @pytest.mark.parametrize("passport,expected_band", list(SEEDED_PASSPORTS.items()))
 async def test_live_band_matches_seed(passport, expected_band):
@@ -95,9 +96,7 @@ async def test_live_band_matches_seed(passport, expected_band):
     client = TrustClient(base_url=ETERNITAS_URL, use_mock=False)
     info = await client.get_trust(passport)
     assert info is not None, f"{passport} missing from Eternitas"
-    assert info.band == expected_band, (
-        f"{passport}: expected band={expected_band} got {info.band}"
-    )
+    assert info.band == expected_band, f"{passport}: expected band={expected_band} got {info.band}"
 
 
 @pytest.mark.asyncio
@@ -125,6 +124,7 @@ async def test_live_allocate_applies_server_multiplier(fresh_db, passport):
 # ---------------------------------------------------------------------------
 # Revoked passport: verify the frozen_account upload gate
 # ---------------------------------------------------------------------------
+
 
 @pytest.mark.asyncio
 async def test_revoked_passport_blocks_upload(fresh_db):
@@ -185,6 +185,7 @@ async def test_revoked_passport_blocks_upload(fresh_db):
 # ---------------------------------------------------------------------------
 # Revoked passport: allocated quota is 0 (multiplier 0.0)
 # ---------------------------------------------------------------------------
+
 
 @pytest.mark.asyncio
 async def test_revoked_passport_allocates_zero_quota(fresh_db):

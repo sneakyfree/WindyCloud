@@ -53,7 +53,8 @@ async def test_frozen_user_blocked_on_stt(db_session, monkeypatch):
     db_session.add(
         UserPlan(
             identity_id="frozen-compute",
-            plan_id="pro", tier="pro",
+            plan_id="pro",
+            tier="pro",
             quota_bytes=107_374_182_400,
             frozen=True,
         )
@@ -80,7 +81,8 @@ async def test_non_frozen_user_passes_gate(db_session, monkeypatch):
     db_session.add(
         UserPlan(
             identity_id="ok-compute",
-            plan_id="pro", tier="pro",
+            plan_id="pro",
+            tier="pro",
             quota_bytes=107_374_182_400,
             frozen=False,
         )
