@@ -7,8 +7,20 @@ import json
 import pytest
 
 
+# Wave 7 G13: archive_migrate now requires a service token, not a user JWT.
+MIGRATE_TOKEN = "cold-storage-test-token"
+
+
+@pytest.fixture
+def migrate_svc_token(monkeypatch):
+    from api.app.config import settings
+
+    monkeypatch.setattr(settings, "service_token", MIGRATE_TOKEN)
+    return {"X-Service-Token": MIGRATE_TOKEN}
+
+
 @pytest.mark.asyncio
-async def test_migrate_registers_files(client):
+async def test_migrate_registers_files(client, migrate_svc_token):
     """POST /api/v1/archive/migrate registers file metadata in cold storage."""
     resp = await client.post(
         "/api/v1/archive/migrate",
@@ -31,7 +43,7 @@ async def test_migrate_registers_files(client):
                 },
             ],
         },
-        headers={"Authorization": "Bearer fake"},
+        headers=migrate_svc_token,
     )
     assert resp.status_code == 200
     body = resp.json()
@@ -44,7 +56,7 @@ async def test_migrate_registers_files(client):
 
 
 @pytest.mark.asyncio
-async def test_migrate_idempotent(client):
+async def test_migrate_idempotent(client, migrate_svc_token):
     """Migrating the same file twice returns already_exists."""
     payload = {
         "product": "windy_mail",
@@ -56,7 +68,7 @@ async def test_migrate_idempotent(client):
     resp = await client.post(
         "/api/v1/archive/migrate",
         json=payload,
-        headers={"Authorization": "Bearer fake"},
+        headers=migrate_svc_token,
     )
     assert resp.status_code == 200
     assert resp.json()["results"][0]["status"] == "migrated"
@@ -65,7 +77,7 @@ async def test_migrate_idempotent(client):
     resp = await client.post(
         "/api/v1/archive/migrate",
         json=payload,
-        headers={"Authorization": "Bearer fake"},
+        headers=migrate_svc_token,
     )
     assert resp.status_code == 200
     assert resp.json()["results"][0]["status"] == "already_exists"
@@ -73,7 +85,7 @@ async def test_migrate_idempotent(client):
 
 
 @pytest.mark.asyncio
-async def test_migrate_invalid_product(client):
+async def test_migrate_invalid_product(client, migrate_svc_token):
     """Unknown product returns 400."""
     resp = await client.post(
         "/api/v1/archive/migrate",
@@ -82,7 +94,7 @@ async def test_migrate_invalid_product(client):
             "windy_identity_id": "test-user-001",
             "files": [{"filename": "test.bin", "size": 100}],
         },
-        headers={"Authorization": "Bearer fake"},
+        headers=migrate_svc_token,
     )
     assert resp.status_code == 400
 
