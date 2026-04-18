@@ -82,7 +82,10 @@ async def identity_by_passport(
     )
     row = result.scalar_one_or_none()
     if row is None:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="No identity for passport")
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="No identity for passport",
+        )
     return BridgeResponse(
         windy_identity_id=row.windy_identity_id,
         passport_number=row.passport_number,
