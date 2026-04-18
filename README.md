@@ -134,8 +134,16 @@ POST   /api/v1/billing/allocate        Provision a plan (service-token, idempote
 GET    /api/v1/analytics/daily         Daily counters for dashboards (auth'd)
 GET    /api/v1/analytics/summary       Aggregate analytics summary
 GET    /api/v1/sync/status             Product-sync state for the current user
+POST   /api/v1/sync/offer-backup       Post-hatch: queue first-backup + push notification (idempotent)
 POST   /api/v1/export/my-data          Kick off a GDPR data-export job
 GET    /api/v1/export/{job_id}         Poll data-export job status
+```
+
+### Deep links (Wave 8)
+
+```
+GET    /api/v1/deeplink/resolve        Resolve a windycloud://<target> URL
+GET    /api/v1/deeplink/manifest       Enumerate supported deep-link targets
 ```
 
 ### Identity bridge
