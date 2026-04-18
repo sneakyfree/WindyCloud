@@ -10,6 +10,7 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from api.app.auth.dependencies import AuthenticatedUser, get_current_user
+from api.app.auth.webhook import require_not_frozen
 from api.app.config import settings
 from api.app.db.engine import get_db
 from api.app.db.models import ComputeJob, ComputeUsageRecord
@@ -93,7 +94,7 @@ async def transcribe(
     file: UploadFile = File(...),
     language: str | None = Form(None),
     model: str = Form("large-v3"),
-    user: AuthenticatedUser = Depends(get_current_user),
+    user: AuthenticatedUser = Depends(require_not_frozen),
     db: AsyncSession = Depends(get_db),
 ):
     provider = _get_stt_provider()
