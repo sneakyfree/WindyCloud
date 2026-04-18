@@ -79,6 +79,45 @@ ETERNITAS_EXPECTED_ISSUER=
 
 Then force-push, rebase, re-merge. 5-minute fix, not a rewrite.
 
-**Halt behaviour during this batch:** per Grant's "Halt on regression"
-instruction for Bucket C, I stopped and surfaced rather than
-continuing to #12/#15/#11/#19.
+**Re-rolled and merged** in the re-run at commit `c05e7ee` — see the
+v2 PR #28. The original #10 stays closed/reverted for audit trail.
+
+---
+
+## [#11 — G6 Redis-backed trust cache + webhook dedup](https://github.com/sneakyfree/WindyCloud/pull/11)
+
+**Held during Wave 7 Bucket C batch merge (2026-04-18).**
+
+Grant's condition: "only merge if `REDIS_URL` is set in your local
+dev — otherwise hold." `REDIS_URL` is unset locally, so merging would
+leave the new Redis backend exercised only via the in-memory fallback
+path — defeating the point of a prod validation.
+
+**Unblock path:** set `REDIS_URL=redis://localhost:6380/1` (Eternitas's
+redis is reachable on port 6380) and re-attempt. Or wait for ElastiCache
+wiring in prod and validate there.
+
+---
+
+## [#19 — G14 passport-revoked webhook requires jti](https://github.com/sneakyfree/WindyCloud/pull/19)
+
+**Held during Wave 7 Bucket C batch merge (2026-04-18).**
+
+Grant's condition: "verify Eternitas emits `jti` first." Result of
+the probe: Eternitas's source has **zero** occurrences of `jti` —
+`grep -rn 'jti' /Users/thewindstorm/eternitas/src` returns no matches.
+The revocation path in `services/revocation.py` has no `jwt.encode` /
+mint-token step at all. Eternitas signs webhook *bodies* with HMAC +
+detached ES256 JWS (`X-Windy-Signature`) rather than emitting a
+JWT-in-body like Cloud's current handler assumes.
+
+If #19 merged as-is, every inbound revocation webhook would 400 with
+"Token missing jti claim — required for replay protection", and
+revoked users would stay un-frozen until someone noticed.
+
+**Unblock path:** either (a) have Eternitas add a `jti` claim on the
+body-signed token pattern, or (b) rework #19 to dedupe on the delivery
+id header (`X-Eternitas-Delivery`) that Eternitas *does* send, matching
+the pattern already in place for `trust.changed`. Option (b) is the
+cleaner fix — delivery-id dedup is Eternitas's documented retry-idempotency
+primitive.
