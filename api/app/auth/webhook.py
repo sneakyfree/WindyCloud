@@ -79,14 +79,9 @@ async def get_user_or_service(
 ) -> AuthenticatedUser:
     """Auth dependency that accepts either a user JWT or a service token.
 
-    Service-token callers must pass:
-      - Header:  X-Service-Token: <shared secret>
-      - Form:    windy_identity_id=<target identity>
-
-    When the service path is used, returns a synthetic AuthenticatedUser
-    scoped to the provided identity. Otherwise falls back to normal JWT
-    auth. Also enforces the frozen-account gate — a frozen plan is
-    rejected with 403 before the handler runs.
+    Used by the archive-upload endpoints (all writes) → fails *closed*
+    on trust-API unavailability so a suspended/revoked user can't slip
+    through during an Eternitas outage.
     """
     service_token = request.headers.get("X-Service-Token")
     if service_token:
@@ -118,17 +113,33 @@ async def get_user_or_service(
         credentials = await scheme(request)
         user = await get_current_user(credentials)
 
-    await _raise_if_blocked(db, user.identity_id)
+    await _raise_if_blocked(db, user.identity_id, fail_closed_on_unavailable=True)
     return user
 
 
-async def _raise_if_blocked(db: AsyncSession, identity_id: str) -> None:
-    """Raise 403 if the user's plan is frozen OR their passport is suspended/revoked.
+async def _raise_if_blocked(
+    db: AsyncSession,
+    identity_id: str,
+    *,
+    fail_closed_on_unavailable: bool = False,
+) -> None:
+    """Raise if the user's plan is frozen OR their passport is suspended/revoked.
 
     - frozen plan (set by the passport-revoked webhook) → 403 frozen_account
     - Eternitas Trust API reports status == "suspended"  → 403 suspended_account
     - Eternitas Trust API reports status == "revoked"    → 403 frozen_account
-    Humans (no passport in the bridge) skip the trust call.
+
+    `fail_closed_on_unavailable` controls what happens when the Trust API
+    is unreachable and we have no cached answer (network / 5xx / timeout):
+
+    - False (default, used on reads): fail open — let the request through
+      so a degraded Eternitas doesn't black-hole normal user traffic.
+    - True (used on writes/mutations): fail closed — return 503
+      `trust_unavailable` so a user we can't verify can't perform a
+      mutation we can't later roll back. GAP G8.
+
+    Humans (no passport in the bridge) skip the trust call entirely on
+    either path.
     """
     plan_row = await db.execute(select(UserPlan).where(UserPlan.identity_id == identity_id))
     plan = plan_row.scalar_one_or_none()
@@ -149,7 +160,12 @@ async def _raise_if_blocked(db: AsyncSession, identity_id: str) -> None:
 
     trust = await get_trust_client().get_trust(bridge.passport_number)
     if trust is None:
-        return  # upstream unavailable → fail open (already logged by client)
+        if fail_closed_on_unavailable:
+            raise HTTPException(
+                status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+                detail="trust_unavailable",
+            )
+        return  # read path — fail open
     if trust.status == "revoked":
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
@@ -170,13 +186,33 @@ async def require_not_frozen(
     user: AuthenticatedUser = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ) -> AuthenticatedUser:
-    """Lightweight dependency: JWT-authed user + frozen-account check."""
+    """Non-mutating read gate — fails *open* if the Trust API is unreachable.
+
+    Use on list/download/export/breakdown endpoints so a degraded
+    Eternitas doesn't black-hole normal reads. Writes should use
+    `require_not_blocked_for_write` instead.
+    """
     await _raise_if_blocked(db, user.identity_id)
+    return user
+
+
+async def require_not_blocked_for_write(
+    user: AuthenticatedUser = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+) -> AuthenticatedUser:
+    """Mutation gate — fails *closed* if the Trust API is unreachable.
+
+    Use on upload/delete/create endpoints where letting an unverifiable
+    user mutate state during an Eternitas outage is worse than returning
+    503 until trust recovers. GAP G8.
+    """
+    await _raise_if_blocked(db, user.identity_id, fail_closed_on_unavailable=True)
     return user
 
 
 __all__ = [
     "get_user_or_service",
+    "require_not_blocked_for_write",
     "require_not_frozen",
     "verify_hmac_sha256",
     "verify_identity_webhook",
