@@ -17,20 +17,27 @@ from api.app.db.models import BillingSnapshot, ComputeUsageRecord, FileRecord, U
 @pytest.mark.asyncio
 async def test_billing_usage_includes_storage_and_compute(client, db_session):
     # Seed a file + a compute record
-    db_session.add(FileRecord(
-        id="f-usage-1",
-        identity_id="test-user-001",
-        product="general", file_type="file", filename="a.bin",
-        storage_key="k1", size_bytes=1024,
-    ))
-    db_session.add(ComputeUsageRecord(
-        id="cu-1",
-        identity_id="test-user-001",
-        month=datetime.utcnow().strftime("%Y-%m"),
-        total_seconds=120.0,
-        total_jobs=2,
-        total_cost_cents=50,
-    ))
+    db_session.add(
+        FileRecord(
+            id="f-usage-1",
+            identity_id="test-user-001",
+            product="general",
+            file_type="file",
+            filename="a.bin",
+            storage_key="k1",
+            size_bytes=1024,
+        )
+    )
+    db_session.add(
+        ComputeUsageRecord(
+            id="cu-1",
+            identity_id="test-user-001",
+            month=datetime.utcnow().strftime("%Y-%m"),
+            total_seconds=120.0,
+            total_jobs=2,
+            total_cost_cents=50,
+        )
+    )
     await db_session.commit()
 
     resp = await client.get("/api/v1/billing/usage", headers={"Authorization": "Bearer fake"})
@@ -47,21 +54,39 @@ async def test_billing_usage_includes_storage_and_compute(client, db_session):
 async def test_billing_history_from_snapshots(client, db_session):
     """Snapshots exist → history reads from them, grouped by month."""
     # Two snapshots in the same month, latest wins
-    db_session.add(BillingSnapshot(
-        id="s-1", identity_id="test-user-001", date="2026-04-01",
-        storage_bytes=1_000_000_000, file_count=10,
-        compute_seconds=60.0, compute_cost_cents=20,
-    ))
-    db_session.add(BillingSnapshot(
-        id="s-2", identity_id="test-user-001", date="2026-04-15",
-        storage_bytes=2_000_000_000, file_count=20,
-        compute_seconds=120.0, compute_cost_cents=40,
-    ))
-    db_session.add(BillingSnapshot(
-        id="s-3", identity_id="test-user-001", date="2026-03-10",
-        storage_bytes=500_000_000, file_count=5,
-        compute_seconds=30.0, compute_cost_cents=10,
-    ))
+    db_session.add(
+        BillingSnapshot(
+            id="s-1",
+            identity_id="test-user-001",
+            date="2026-04-01",
+            storage_bytes=1_000_000_000,
+            file_count=10,
+            compute_seconds=60.0,
+            compute_cost_cents=20,
+        )
+    )
+    db_session.add(
+        BillingSnapshot(
+            id="s-2",
+            identity_id="test-user-001",
+            date="2026-04-15",
+            storage_bytes=2_000_000_000,
+            file_count=20,
+            compute_seconds=120.0,
+            compute_cost_cents=40,
+        )
+    )
+    db_session.add(
+        BillingSnapshot(
+            id="s-3",
+            identity_id="test-user-001",
+            date="2026-03-10",
+            storage_bytes=500_000_000,
+            file_count=5,
+            compute_seconds=30.0,
+            compute_cost_cents=10,
+        )
+    )
     await db_session.commit()
 
     resp = await client.get(
@@ -82,10 +107,16 @@ async def test_billing_history_from_snapshots(client, db_session):
 @pytest.mark.asyncio
 async def test_billing_history_fallback_to_compute_usage(client, db_session):
     """No snapshots → falls back to ComputeUsageRecord rows."""
-    db_session.add(ComputeUsageRecord(
-        id="cu-hist-1", identity_id="test-user-001",
-        month="2026-02", total_seconds=300.0, total_jobs=5, total_cost_cents=75,
-    ))
+    db_session.add(
+        ComputeUsageRecord(
+            id="cu-hist-1",
+            identity_id="test-user-001",
+            month="2026-02",
+            total_seconds=300.0,
+            total_jobs=5,
+            total_cost_cents=75,
+        )
+    )
     await db_session.commit()
 
     resp = await client.get(
@@ -99,16 +130,27 @@ async def test_billing_history_fallback_to_compute_usage(client, db_session):
 
 @pytest.mark.asyncio
 async def test_billing_estimate(client, db_session):
-    db_session.add(FileRecord(
-        id="f-est-1", identity_id="test-user-001",
-        product="general", file_type="file", filename="big.bin",
-        storage_key="ke", size_bytes=5_000_000_000,  # 5 GB, in free tier
-    ))
-    db_session.add(ComputeUsageRecord(
-        id="cu-est-1", identity_id="test-user-001",
-        month=datetime.utcnow().strftime("%Y-%m"),
-        total_seconds=60.0, total_jobs=1, total_cost_cents=30,
-    ))
+    db_session.add(
+        FileRecord(
+            id="f-est-1",
+            identity_id="test-user-001",
+            product="general",
+            file_type="file",
+            filename="big.bin",
+            storage_key="ke",
+            size_bytes=5_000_000_000,  # 5 GB, in free tier
+        )
+    )
+    db_session.add(
+        ComputeUsageRecord(
+            id="cu-est-1",
+            identity_id="test-user-001",
+            month=datetime.utcnow().strftime("%Y-%m"),
+            total_seconds=60.0,
+            total_jobs=1,
+            total_cost_cents=30,
+        )
+    )
     await db_session.commit()
 
     resp = await client.get(
@@ -123,11 +165,17 @@ async def test_billing_estimate(client, db_session):
 
 @pytest.mark.asyncio
 async def test_billing_sync_aggregates_product_usage(client, db_session):
-    db_session.add(FileRecord(
-        id="f-sync-1", identity_id="test-user-001",
-        product="windy_mail", file_type="mail_backup", filename="dump.gz",
-        storage_key="k-sync", size_bytes=50_000_000,
-    ))
+    db_session.add(
+        FileRecord(
+            id="f-sync-1",
+            identity_id="test-user-001",
+            product="windy_mail",
+            file_type="mail_backup",
+            filename="dump.gz",
+            storage_key="k-sync",
+            size_bytes=50_000_000,
+        )
+    )
     await db_session.commit()
 
     resp = await client.post(
@@ -144,11 +192,17 @@ async def test_billing_sync_aggregates_product_usage(client, db_session):
 
 @pytest.mark.asyncio
 async def test_billing_summary_agent_friendly(client, db_session):
-    db_session.add(FileRecord(
-        id="f-sum-1", identity_id="test-user-001",
-        product="general", file_type="file", filename="s.bin",
-        storage_key="k-sum", size_bytes=500_000,
-    ))
+    db_session.add(
+        FileRecord(
+            id="f-sum-1",
+            identity_id="test-user-001",
+            product="general",
+            file_type="file",
+            filename="s.bin",
+            storage_key="k-sum",
+            size_bytes=500_000,
+        )
+    )
     await db_session.commit()
 
     resp = await client.get(
@@ -170,11 +224,14 @@ async def test_get_plan_reads_existing_plan(client, db_session):
     test tracks the main-branch numbers until that PR merges."""
     from api.app.routes.billing import PLAN_TIERS
 
-    db_session.add(UserPlan(
-        identity_id="test-user-001",
-        plan_id="pro", tier="pro",
-        quota_bytes=PLAN_TIERS["pro"]["quota_bytes"],
-    ))
+    db_session.add(
+        UserPlan(
+            identity_id="test-user-001",
+            plan_id="pro",
+            tier="pro",
+            quota_bytes=PLAN_TIERS["pro"]["quota_bytes"],
+        )
+    )
     await db_session.commit()
 
     resp = await client.get(

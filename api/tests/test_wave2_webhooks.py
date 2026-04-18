@@ -66,6 +66,7 @@ def eternitas_es256(monkeypatch):
 # identity.created
 # ---------------------------------------------------------------------------
 
+
 @pytest.mark.asyncio
 async def test_identity_created_provisions_free_plan(client, db_session, hmac_secret):
     payload = {"windy_identity_id": "new-user-1", "tier": "free"}
@@ -81,9 +82,9 @@ async def test_identity_created_provisions_free_plan(client, db_session, hmac_se
     assert resp.status_code == 201, resp.text
     assert resp.json()["tier"] == "free"
 
-    plan = (await db_session.execute(
-        select(UserPlan).where(UserPlan.identity_id == "new-user-1")
-    )).scalar_one()
+    plan = (
+        await db_session.execute(select(UserPlan).where(UserPlan.identity_id == "new-user-1"))
+    ).scalar_one()
     assert plan.quota_bytes == 5_368_709_120
     assert plan.frozen is False
 
@@ -103,9 +104,11 @@ async def test_identity_created_links_passport(client, db_session, hmac_secret):
     )
     assert resp.status_code == 201
 
-    bridge = (await db_session.execute(
-        select(IdentityBridge).where(IdentityBridge.passport_number == "ET-99999")
-    )).scalar_one()
+    bridge = (
+        await db_session.execute(
+            select(IdentityBridge).where(IdentityBridge.passport_number == "ET-99999")
+        )
+    ).scalar_one()
     assert bridge.windy_identity_id == "new-user-2"
 
 
@@ -145,10 +148,10 @@ async def test_identity_created_is_idempotent(client, db_session, hmac_secret):
         assert resp.status_code == 201
 
     rows = (
-        await db_session.execute(
-            select(UserPlan).where(UserPlan.identity_id == "repeat-1")
-        )
-    ).scalars().all()
+        (await db_session.execute(select(UserPlan).where(UserPlan.identity_id == "repeat-1")))
+        .scalars()
+        .all()
+    )
     assert len(rows) == 1
 
 
@@ -156,10 +159,9 @@ async def test_identity_created_is_idempotent(client, db_session, hmac_secret):
 # passport.revoked
 # ---------------------------------------------------------------------------
 
+
 @pytest.mark.asyncio
-async def test_passport_revoked_freezes_plan(
-    client, db_session, hmac_secret, eternitas_es256
-):
+async def test_passport_revoked_freezes_plan(client, db_session, hmac_secret, eternitas_es256):
     # Provision an identity with bridge
     payload = {
         "windy_identity_id": "revoke-me",
@@ -174,12 +176,14 @@ async def test_passport_revoked_freezes_plan(
     )
 
     # Eternitas signs a revocation token
-    revoke_token = eternitas_es256({
-        "sub": "ET-42",
-        "passport_number": "ET-42",
-        "reason": "ban",
-        "exp": int(time.time()) + 60,
-    })
+    revoke_token = eternitas_es256(
+        {
+            "sub": "ET-42",
+            "passport_number": "ET-42",
+            "reason": "ban",
+            "exp": int(time.time()) + 60,
+        }
+    )
 
     resp = await client.post(
         "/api/v1/webhooks/passport/revoked",
@@ -188,9 +192,9 @@ async def test_passport_revoked_freezes_plan(
     assert resp.status_code == 200, resp.text
     assert resp.json()["status"] == "frozen"
 
-    plan = (await db_session.execute(
-        select(UserPlan).where(UserPlan.identity_id == "revoke-me")
-    )).scalar_one()
+    plan = (
+        await db_session.execute(select(UserPlan).where(UserPlan.identity_id == "revoke-me"))
+    ).scalar_one()
     assert plan.frozen is True
 
 
@@ -205,11 +209,13 @@ async def test_passport_revoked_rejects_unsigned(client, eternitas_es256):
 
 @pytest.mark.asyncio
 async def test_passport_revoked_unknown_passport(client, eternitas_es256):
-    token = eternitas_es256({
-        "sub": "ET-NOPE",
-        "passport_number": "ET-NOPE",
-        "exp": int(time.time()) + 60,
-    })
+    token = eternitas_es256(
+        {
+            "sub": "ET-NOPE",
+            "passport_number": "ET-NOPE",
+            "exp": int(time.time()) + 60,
+        }
+    )
     resp = await client.post(
         "/api/v1/webhooks/passport/revoked",
         json={"token": token},

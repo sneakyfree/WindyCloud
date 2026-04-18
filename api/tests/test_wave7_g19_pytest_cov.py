@@ -47,9 +47,7 @@ def test_coverage_is_configured():
     # but high enough to block future regressions.
     fail_under = report.get("fail_under")
     assert isinstance(fail_under, int)
-    assert 40 <= fail_under <= 70, (
-        f"fail_under={fail_under} is outside the 40–70 sanity band"
-    )
+    assert 40 <= fail_under <= 70, f"fail_under={fail_under} is outside the 40–70 sanity band"
 
 
 def test_omit_excludes_noise():

@@ -76,9 +76,7 @@ async def _link(client, identity: str, passport: str):
 
 
 @pytest.mark.asyncio
-async def test_concurrent_same_identity_different_passports(
-    per_request_client, service_token
-):
+async def test_concurrent_same_identity_different_passports(per_request_client, service_token):
     """5 parallel link-passport calls, same identity, 5 different passports.
 
     Pre-G12: 1 × 200 + 4 × 500 (IntegrityError surfacing).
@@ -106,31 +104,23 @@ async def test_concurrent_same_identity_different_passports(
 
 
 @pytest.mark.asyncio
-async def test_concurrent_same_identity_same_passport_idempotent(
-    per_request_client, service_token
-):
+async def test_concurrent_same_identity_same_passport_idempotent(per_request_client, service_token):
     """10 parallel calls with the same (identity, passport) — all 200, one row, same passport."""
     ac, factory = per_request_client
-    results = await asyncio.gather(
-        *[_link(ac, "idem-identity", "ET-IDEM-1") for _ in range(10)]
-    )
+    results = await asyncio.gather(*[_link(ac, "idem-identity", "ET-IDEM-1") for _ in range(10)])
     assert all(r.status_code == 200 for r in results)
 
     async with factory() as s:
         row = (
             await s.execute(
-                select(IdentityBridge).where(
-                    IdentityBridge.windy_identity_id == "idem-identity"
-                )
+                select(IdentityBridge).where(IdentityBridge.windy_identity_id == "idem-identity")
             )
         ).scalar_one()
     assert row.passport_number == "ET-IDEM-1"
 
 
 @pytest.mark.asyncio
-async def test_sequential_passport_change_still_updates(
-    per_request_client, service_token
-):
+async def test_sequential_passport_change_still_updates(per_request_client, service_token):
     """Idempotency doesn't mean "immutable" — a later link call for the
     same identity with a *different* passport must update."""
     ac, factory = per_request_client
@@ -142,9 +132,7 @@ async def test_sequential_passport_change_still_updates(
     async with factory() as s:
         row = (
             await s.execute(
-                select(IdentityBridge).where(
-                    IdentityBridge.windy_identity_id == "mutable-identity"
-                )
+                select(IdentityBridge).where(IdentityBridge.windy_identity_id == "mutable-identity")
             )
         ).scalar_one()
     assert row.passport_number == "ET-SECOND"

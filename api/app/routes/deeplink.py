@@ -121,8 +121,5 @@ async def manifest() -> dict[str, Any]:
     """
     return {
         "scheme": SCHEME,
-        "targets": [
-            {"target": key, **spec}
-            for key, spec in sorted(TARGETS.items())
-        ],
+        "targets": [{"target": key, **spec} for key, spec in sorted(TARGETS.items())],
     }

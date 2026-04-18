@@ -47,6 +47,7 @@ router = APIRouter()
 # with full stack + Sentry if configured, so we still see the bug.
 # ---------------------------------------------------------------------------
 
+
 def crash_safe_webhook(fn):
     """Decorator: catch unhandled exceptions, log, return 200.
 
@@ -78,6 +79,7 @@ def crash_safe_webhook(fn):
 # ---------------------------------------------------------------------------
 # POST /webhooks/identity/created  (contract #1)
 # ---------------------------------------------------------------------------
+
 
 class IdentityCreatedPayload(BaseModel):
     windy_identity_id: str
@@ -148,9 +150,7 @@ async def handle_identity_created(
         )
 
     body_bytes = await request.body()
-    if not verify_hmac_sha256(
-        body_bytes, signature, settings.identity_webhook_secret
-    ):
+    if not verify_hmac_sha256(body_bytes, signature, settings.identity_webhook_secret):
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Invalid signature",
@@ -223,6 +223,7 @@ async def handle_identity_created(
 # POST /webhooks/passport/revoked  (contract #2)
 # ---------------------------------------------------------------------------
 
+
 class PassportRevokedPayload(BaseModel):
     """Eternitas revocation payload.
 
@@ -231,6 +232,7 @@ class PassportRevokedPayload(BaseModel):
     signature header on the raw body is accepted as a fallback so older
     senders don't break.
     """
+
     token: str | None = None
     passport_number: str | None = None
     reason: str | None = None
@@ -325,6 +327,7 @@ async def handle_passport_revoked(
 # ---------------------------------------------------------------------------
 # POST /webhooks/trust/changed  (Wave 4 — cache invalidation)
 # ---------------------------------------------------------------------------
+
 
 class TrustChangedPayload(BaseModel):
     """Eternitas trust.changed envelope — docs/trust-api.md."""
@@ -449,6 +452,7 @@ async def handle_trust_changed(
 # Shared helper — also used by the identity/link-passport route.
 # ---------------------------------------------------------------------------
 
+
 async def _link_passport(
     db: AsyncSession,
     *,
@@ -508,9 +512,7 @@ async def _link_passport(
         # Unsupported dialect — fall back to the pre-G12 path. Safer to
         # race here than to ship broken SQL for a backend we don't know.
         result = await db.execute(
-            select(IdentityBridge).where(
-                IdentityBridge.windy_identity_id == windy_identity_id
-            )
+            select(IdentityBridge).where(IdentityBridge.windy_identity_id == windy_identity_id)
         )
         row = result.scalar_one_or_none()
         if row is None:
@@ -526,8 +528,6 @@ async def _link_passport(
 
     # Read back the row so the caller gets the resolved state.
     result = await db.execute(
-        select(IdentityBridge).where(
-            IdentityBridge.windy_identity_id == windy_identity_id
-        )
+        select(IdentityBridge).where(IdentityBridge.windy_identity_id == windy_identity_id)
     )
     return result.scalar_one()

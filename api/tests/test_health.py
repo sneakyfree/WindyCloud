@@ -68,6 +68,4 @@ async def test_status_endpoint_pillars_no_provider_leak(client):
         assert pillar["enabled"] is True
         # Backends intentionally removed — the public status only
         # confirms a pillar is on.
-        assert "provider" not in pillar, (
-            f"{pillar_name} pillar still leaks provider: {pillar}"
-        )
+        assert "provider" not in pillar, f"{pillar_name} pillar still leaks provider: {pillar}"

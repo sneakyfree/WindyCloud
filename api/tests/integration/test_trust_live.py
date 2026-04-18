@@ -62,6 +62,7 @@ pytestmark = pytest.mark.skipif(
 # Real HTTP scenarios
 # ---------------------------------------------------------------------------
 
+
 @pytest.mark.asyncio
 async def test_known_passport_returns_full_contract():
     if not KNOWN_PASSPORT:
@@ -114,9 +115,7 @@ async def test_cache_hit_miss_headers():
         r1.headers.get("X-Trust-Cache"),
         r2.headers.get("X-Trust-Cache"),
     )
-    assert any(h == "hit" for h in trust_cache_values), (
-        "Expected a cache hit on the second call"
-    )
+    assert any(h == "hit" for h in trust_cache_values), "Expected a cache hit on the second call"
 
 
 @pytest.mark.asyncio
@@ -129,6 +128,7 @@ async def test_unrecognised_prefix_returns_400():
 # ---------------------------------------------------------------------------
 # Client-side cache behavior + trust.changed-style invalidation
 # ---------------------------------------------------------------------------
+
 
 @pytest.mark.asyncio
 async def test_client_cache_repeats_single_http_call():
@@ -159,6 +159,7 @@ async def test_invalidate_forces_refetch():
 # trust.changed webhook round-trip (simulated dispatch against our own app)
 # ---------------------------------------------------------------------------
 
+
 @pytest.mark.asyncio
 async def test_trust_changed_webhook_flushes_our_cache(monkeypatch):
     """Hand-craft a signed trust.changed delivery and confirm it flushes cache.
@@ -187,14 +188,16 @@ async def test_trust_changed_webhook_flushes_our_cache(monkeypatch):
     assert "ET-CACHE-ME" in client._cache
 
     # Build a signed delivery
-    body = json.dumps({
-        "event": "trust.changed",
-        "passport_number": "ET-CACHE-ME",
-        "reason": "integrity_band: good→fair",
-        "old_band": "good",
-        "new_band": "fair",
-        "timestamp": "2026-04-16T20:11:03.118+00:00Z",
-    }).encode()
+    body = json.dumps(
+        {
+            "event": "trust.changed",
+            "passport_number": "ET-CACHE-ME",
+            "reason": "integrity_band: good→fair",
+            "old_band": "good",
+            "new_band": "fair",
+            "timestamp": "2026-04-16T20:11:03.118+00:00Z",
+        }
+    ).encode()
     sig = "sha256=" + hmac.new(secret.encode(), body, hashlib.sha256).hexdigest()
 
     app = create_app()

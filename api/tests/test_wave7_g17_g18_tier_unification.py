@@ -38,8 +38,7 @@ def test_plan_tier_quotas_match_settings_tier_quotas():
     quotas = _tier_quotas()
     for tier, meta in PLAN_TIERS.items():
         assert meta["quota_bytes"] == quotas[tier], (
-            f"{tier}: PLAN_TIERS says {meta['quota_bytes']}, "
-            f"_tier_quotas says {quotas[tier]}"
+            f"{tier}: PLAN_TIERS says {meta['quota_bytes']}, _tier_quotas says {quotas[tier]}"
         )
 
 

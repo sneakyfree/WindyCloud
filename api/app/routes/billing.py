@@ -315,9 +315,9 @@ PLAN_NAMES: dict[str, str] = {
 # Placeholders — pricing team owns the final values (docs/POST_LAUNCH_TODOS.md).
 PLAN_PRICES_CENTS: dict[str, int] = {
     "free": 0,
-    "pro": 500,     # $5/mo  for 100 GB
+    "pro": 500,  # $5/mo  for 100 GB
     "ultra": 1500,  # $15/mo for 1 TB
-    "max": 5000,    # $50/mo for 5 TB
+    "max": 5000,  # $50/mo for 5 TB
 }
 
 
@@ -432,9 +432,7 @@ async def allocate_plan(
     multiplier = trust.tier_multiplier
     effective_quota = int(base_quota * multiplier)
 
-    result = await db.execute(
-        select(UserPlan).where(UserPlan.identity_id == windy_identity_id)
-    )
+    result = await db.execute(select(UserPlan).where(UserPlan.identity_id == windy_identity_id))
     plan = result.scalar_one_or_none()
     if plan is None:
         plan = UserPlan(

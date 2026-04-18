@@ -44,9 +44,9 @@ BAND_MULTIPLIERS: dict[str, float] = {
 @dataclass(frozen=True)
 class TrustInfo:
     passport_number: str
-    status: str                       # "active" | "suspended" | "revoked"
-    tier_multiplier: float            # Effective (LOWER of clearance vs band)
-    band: str = "fair"                # "exceptional"|"good"|"fair"|"poor"|"critical"
+    status: str  # "active" | "suspended" | "revoked"
+    tier_multiplier: float  # Effective (LOWER of clearance vs band)
+    band: str = "fair"  # "exceptional"|"good"|"fair"|"poor"|"critical"
     clearance_level: str = "registered"
     integrity_score: int = 500
     dimensions: dict[str, int] = field(default_factory=dict)
@@ -67,9 +67,7 @@ class TrustInfo:
         if multiplier is None:
             multiplier = BAND_MULTIPLIERS.get(band, 1.0)
         return cls(
-            passport_number=str(
-                data.get("passport_number") or data.get("passport") or ""
-            ),
+            passport_number=str(data.get("passport_number") or data.get("passport") or ""),
             status=str(data.get("status") or "active"),
             tier_multiplier=float(multiplier),
             band=band,
@@ -98,6 +96,7 @@ class TrustInfo:
 # Client
 # ---------------------------------------------------------------------------
 
+
 class TrustClient:
     """Async Eternitas Trust API client with in-memory TTL cache."""
 
@@ -111,9 +110,7 @@ class TrustClient:
         self._base_url = (base_url or settings.eternitas_url).rstrip("/")
         self._ttl = ttl_seconds if ttl_seconds is not None else settings.trust_cache_ttl_seconds
         self._timeout = timeout if timeout is not None else settings.trust_http_timeout_seconds
-        self._use_mock = bool(
-            use_mock if use_mock is not None else settings.eternitas_use_mock
-        )
+        self._use_mock = bool(use_mock if use_mock is not None else settings.eternitas_use_mock)
         self._cache: dict[str, tuple[float, TrustInfo]] = {}
         self._lock = asyncio.Lock()
 

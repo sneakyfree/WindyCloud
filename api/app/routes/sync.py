@@ -215,9 +215,7 @@ async def offer_backup(
             "recording_count": existing.recording_count,
             "notified": existing.notification_sent,
             "notified_at": (
-                existing.notification_sent_at.isoformat()
-                if existing.notification_sent_at
-                else None
+                existing.notification_sent_at.isoformat() if existing.notification_sent_at else None
             ),
         }
 

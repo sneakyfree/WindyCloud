@@ -25,6 +25,7 @@ import pytest
 # G31 — /health is minimal
 # ---------------------------------------------------------------------------
 
+
 @pytest.mark.asyncio
 async def test_public_health_returns_only_status(client):
     resp = await client.get("/health")
@@ -59,9 +60,7 @@ async def test_public_status_does_not_leak_provider_names(client):
     body = resp.json()
     # Pillars are present, but each pillar must not carry `provider`.
     for pillar in body["pillars"].values():
-        assert set(pillar.keys()) == {"enabled"}, (
-            f"/status pillar leaks fields: {pillar}"
-        )
+        assert set(pillar.keys()) == {"enabled"}, f"/status pillar leaks fields: {pillar}"
 
 
 @pytest.mark.asyncio
@@ -83,6 +82,7 @@ async def test_health_full_exposes_detailed_info(client):
 # G33 — startup task failures reach Sentry
 # ---------------------------------------------------------------------------
 
+
 @pytest.mark.asyncio
 async def test_startup_task_success_returns_true(caplog):
     from api.app.main import _run_one_startup_task
@@ -94,9 +94,7 @@ async def test_startup_task_success_returns_true(caplog):
         ok = await _run_one_startup_task("fake_ok", ok_task)
 
     assert ok is True
-    assert not any(
-        "Startup task fake_ok failed" in r.message for r in caplog.records
-    )
+    assert not any("Startup task fake_ok failed" in r.message for r in caplog.records)
 
 
 @pytest.mark.asyncio
@@ -110,9 +108,9 @@ async def test_startup_task_failure_returns_false_and_logs(caplog):
         ok = await _run_one_startup_task("fake_bad", bad_task)
 
     assert ok is False
-    assert any(
-        "Startup task fake_bad failed" in r.message for r in caplog.records
-    ), "Failure must log loudly — ops needs to see it"
+    assert any("Startup task fake_bad failed" in r.message for r in caplog.records), (
+        "Failure must log loudly — ops needs to see it"
+    )
 
 
 @pytest.mark.asyncio

@@ -63,10 +63,12 @@ async def test_warmup_fetches_every_linked_passport(db_session, fast_warmup):
 
     # Seed bridge rows
     for i in range(5):
-        db_session.add(IdentityBridge(
-            windy_identity_id=f"g22-id-{i}",
-            passport_number=f"ET-G22-{i}",
-        ))
+        db_session.add(
+            IdentityBridge(
+                windy_identity_id=f"g22-id-{i}",
+                passport_number=f"ET-G22-{i}",
+            )
+        )
     await db_session.commit()
 
     # Stub returns a TrustInfo for 3 of them, None for 2
@@ -89,10 +91,12 @@ async def test_warmup_fetches_every_linked_passport(db_session, fast_warmup):
 async def test_warmup_tolerates_individual_failures(db_session, fast_warmup):
     """A failing passport fetch doesn't abort the whole warmup."""
     for pn in ("ET-OK-A", "ET-BREAK", "ET-OK-B"):
-        db_session.add(IdentityBridge(
-            windy_identity_id=f"id-{pn}",
-            passport_number=pn,
-        ))
+        db_session.add(
+            IdentityBridge(
+                windy_identity_id=f"id-{pn}",
+                passport_number=pn,
+            )
+        )
     await db_session.commit()
 
     fast_warmup._raises.add("ET-BREAK")
@@ -110,10 +114,12 @@ async def test_warmup_tolerates_individual_failures(db_session, fast_warmup):
 async def test_warmup_respects_max_passports_cap(db_session, fast_warmup):
     """max_passports is a hard cap so startup can't block on a huge bridge."""
     for i in range(20):
-        db_session.add(IdentityBridge(
-            windy_identity_id=f"cap-{i}",
-            passport_number=f"ET-CAP-{i:03d}",
-        ))
+        db_session.add(
+            IdentityBridge(
+                windy_identity_id=f"cap-{i}",
+                passport_number=f"ET-CAP-{i:03d}",
+            )
+        )
     await db_session.commit()
 
     counters = await warmup_trust_cache(db_session, interval=0.0, max_passports=5)

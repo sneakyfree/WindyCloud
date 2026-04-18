@@ -62,6 +62,7 @@ async def _run_one_startup_task(name: str, task_fn) -> bool:
         logger.exception("Startup task %s failed", name)
         try:
             import sentry_sdk
+
             sentry_sdk.capture_exception(exc)
         except ImportError:
             pass

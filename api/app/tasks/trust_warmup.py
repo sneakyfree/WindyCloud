@@ -45,9 +45,7 @@ async def warmup_trust_cache(
     """
     from api.app.services.trust_client import get_trust_client
 
-    result = await db.execute(
-        select(IdentityBridge.passport_number).limit(max_passports)
-    )
+    result = await db.execute(select(IdentityBridge.passport_number).limit(max_passports))
     passports = [row[0] for row in result.all()]
 
     if not passports:
@@ -73,8 +71,7 @@ async def warmup_trust_cache(
         "failed": failed,
     }
     logger.info(
-        "trust-warmup: pre-fetched %(ok)d/%(attempted)d passports "
-        "(failed=%(failed)d)",
+        "trust-warmup: pre-fetched %(ok)d/%(attempted)d passports (failed=%(failed)d)",
         counters,
     )
     return counters

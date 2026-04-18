@@ -38,9 +38,7 @@ async def test_resolve_plan(client):
 
 @pytest.mark.asyncio
 async def test_resolve_unknown_target_is_rejected(client):
-    resp = await client.get(
-        "/api/v1/deeplink/resolve", params={"target": "evil-open-redirect"}
-    )
+    resp = await client.get("/api/v1/deeplink/resolve", params={"target": "evil-open-redirect"})
     assert resp.status_code == 400
 
 

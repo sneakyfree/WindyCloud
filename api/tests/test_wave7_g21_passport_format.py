@@ -39,21 +39,21 @@ VALID_EXAMPLES = [
 ]
 
 INVALID_EXAMPLES = [
-    "",                              # empty
-    None,                            # non-string guard
-    "../../internal-api/admin",      # the live-probe payload
-    "ET26-../../etc/passwd",         # traversal inside ET26 prefix
-    "ET/with/slashes",               # slash chars
-    "ET?query=param",                # query-string sneak
-    "ET#fragment",                   # fragment
-    "ET%2F..%2Ftest",                # pre-encoded traversal
-    "ET test",                       # whitespace
-    "et26-lower-case",               # lowercase rejected
-    "XX-unknown-prefix",             # wrong prefix
-    "ET" + "A" * 80,                 # over MAX_PASSPORT_LEN
-    "AB12345",                       # bad prefix
-    "ET\0null",                      # null byte
-    "ET\nnewline",                   # newline
+    "",  # empty
+    None,  # non-string guard
+    "../../internal-api/admin",  # the live-probe payload
+    "ET26-../../etc/passwd",  # traversal inside ET26 prefix
+    "ET/with/slashes",  # slash chars
+    "ET?query=param",  # query-string sneak
+    "ET#fragment",  # fragment
+    "ET%2F..%2Ftest",  # pre-encoded traversal
+    "ET test",  # whitespace
+    "et26-lower-case",  # lowercase rejected
+    "XX-unknown-prefix",  # wrong prefix
+    "ET" + "A" * 80,  # over MAX_PASSPORT_LEN
+    "AB12345",  # bad prefix
+    "ET\0null",  # null byte
+    "ET\nnewline",  # newline
 ]
 
 
@@ -164,6 +164,7 @@ async def test_by_passport_plain_bad_format_returns_400(client, service_token):
 # ---------------------------------------------------------------------------
 # Defense in depth: trust client URL-encodes the path segment
 # ---------------------------------------------------------------------------
+
 
 @pytest.mark.asyncio
 async def test_trust_client_url_encodes_passport(monkeypatch):

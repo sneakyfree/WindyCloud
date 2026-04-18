@@ -66,9 +66,7 @@ async def _real_gate_client(db_session, identity_id: str):
 @pytest.mark.asyncio
 async def test_upload_fails_closed_when_trust_unavailable(db_session, trust_down):
     """Bot identity + Eternitas down → upload 503 trust_unavailable."""
-    db_session.add(
-        IdentityBridge(windy_identity_id="bot-1", passport_number="ET-BOT-1")
-    )
+    db_session.add(IdentityBridge(windy_identity_id="bot-1", passport_number="ET-BOT-1"))
     db_session.add(
         UserPlan(
             identity_id="bot-1",
@@ -121,9 +119,7 @@ async def test_read_gate_still_fails_open_when_trust_unavailable(db_session, tru
     Direct call to _raise_if_blocked without fail_closed — a bot whose
     passport can't be verified should fall through without raising.
     """
-    db_session.add(
-        IdentityBridge(windy_identity_id="bot-r", passport_number="ET-BOT-R")
-    )
+    db_session.add(IdentityBridge(windy_identity_id="bot-r", passport_number="ET-BOT-R"))
     db_session.add(
         UserPlan(
             identity_id="bot-r",
@@ -143,8 +139,6 @@ async def test_read_gate_still_fails_open_when_trust_unavailable(db_session, tru
     from fastapi import HTTPException
 
     with pytest.raises(HTTPException) as exc:
-        await _raise_if_blocked(
-            db_session, "bot-r", fail_closed_on_unavailable=True
-        )
+        await _raise_if_blocked(db_session, "bot-r", fail_closed_on_unavailable=True)
     assert exc.value.status_code == 503
     assert exc.value.detail == "trust_unavailable"

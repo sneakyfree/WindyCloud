@@ -22,21 +22,29 @@ from api.app.services.trust_client import (
 # TrustInfo
 # ---------------------------------------------------------------------------
 
+
 def test_from_response_uses_server_tier_multiplier_when_present():
-    info = TrustInfo.from_response({
-        "passport_number": "ET26-K7BF-42MN",
-        "status": "active",
-        "band": "good",
-        "tier_multiplier": 1.7,  # server-computed; client must prefer it
-        "clearance_level": "cleared",
-        "integrity_score": 812,
-        "dimensions": {"honesty": 800, "reliability": 820, "compliance": 810,
-                       "safety": 815, "reputation": 810},
-        "allowed_actions": ["read", "send"],
-        "denied_actions": ["commit_push"],
-        "cache_ttl_seconds": 300,
-        "evaluated_at": "2026-04-17T00:00:00Z",
-    })
+    info = TrustInfo.from_response(
+        {
+            "passport_number": "ET26-K7BF-42MN",
+            "status": "active",
+            "band": "good",
+            "tier_multiplier": 1.7,  # server-computed; client must prefer it
+            "clearance_level": "cleared",
+            "integrity_score": 812,
+            "dimensions": {
+                "honesty": 800,
+                "reliability": 820,
+                "compliance": 810,
+                "safety": 815,
+                "reputation": 810,
+            },
+            "allowed_actions": ["read", "send"],
+            "denied_actions": ["commit_push"],
+            "cache_ttl_seconds": 300,
+            "evaluated_at": "2026-04-17T00:00:00Z",
+        }
+    )
     assert info.tier_multiplier == 1.7
     assert info.band == "good"
     assert info.clearance_level == "cleared"
@@ -47,23 +55,27 @@ def test_from_response_uses_server_tier_multiplier_when_present():
 
 def test_from_response_falls_back_to_band_table_when_multiplier_missing():
     for band, expected in BAND_MULTIPLIERS.items():
-        info = TrustInfo.from_response({
-            "passport_number": f"ET-{band.upper()}",
-            "status": "active",
-            "band": band,
-            # tier_multiplier intentionally absent
-        })
+        info = TrustInfo.from_response(
+            {
+                "passport_number": f"ET-{band.upper()}",
+                "status": "active",
+                "band": band,
+                # tier_multiplier intentionally absent
+            }
+        )
         assert info.tier_multiplier == expected, (
             f"{band}: expected fallback {expected}, got {info.tier_multiplier}"
         )
 
 
 def test_from_response_unknown_band_defaults_to_one():
-    info = TrustInfo.from_response({
-        "passport_number": "ET-MYSTERY",
-        "status": "active",
-        "band": "mystery_band",
-    })
+    info = TrustInfo.from_response(
+        {
+            "passport_number": "ET-MYSTERY",
+            "status": "active",
+            "band": "mystery_band",
+        }
+    )
     assert info.tier_multiplier == 1.0
 
 
@@ -84,6 +96,7 @@ def test_is_active_property():
 # ---------------------------------------------------------------------------
 # TrustClient — non-happy paths
 # ---------------------------------------------------------------------------
+
 
 def _patch_httpx(monkeypatch, response_status=200, response_body=None, raise_on_request=None):
     """Swap httpx.AsyncClient for a stub that returns / raises what we say."""
@@ -219,13 +232,16 @@ async def test_5xx_returns_stale_cache_when_available(monkeypatch):
     """Once we've cached a good response, a later upstream outage returns the stale value."""
     responses = [
         # First call: OK
-        (200, {
-            "passport_number": "ET-STALE",
-            "status": "active",
-            "band": "good",
-            "tier_multiplier": 2.0,
-            "cache_ttl_seconds": 300,
-        }),
+        (
+            200,
+            {
+                "passport_number": "ET-STALE",
+                "status": "active",
+                "band": "good",
+                "tier_multiplier": 2.0,
+                "cache_ttl_seconds": 300,
+            },
+        ),
         # Second call: 500
         (500, None),
     ]
@@ -261,6 +277,7 @@ async def test_5xx_returns_stale_cache_when_available(monkeypatch):
     first = await client.get_trust("ET-STALE")
     # Force TTL expiry so second call attempts HTTP again.
     import time as _t
+
     _t.sleep(1.1)
     second = await client.get_trust("ET-STALE")
 
@@ -280,21 +297,24 @@ def test_get_trust_client_returns_singleton(monkeypatch):
 
 def test_clear_cache_empties_store():
     client = TrustClient(base_url="http://x", use_mock=True)
-    client._cache["seed"] = (0.0, TrustInfo(
-        passport_number="seed", status="active", tier_multiplier=1.0
-    ))
+    client._cache["seed"] = (
+        0.0,
+        TrustInfo(passport_number="seed", status="active", tier_multiplier=1.0),
+    )
     client.clear_cache()
     assert client._cache == {}
 
 
 def test_invalidate_pops_one_key():
     client = TrustClient(base_url="http://x", use_mock=True)
-    client._cache["keep"] = (0.0, TrustInfo(
-        passport_number="keep", status="active", tier_multiplier=1.0
-    ))
-    client._cache["drop"] = (0.0, TrustInfo(
-        passport_number="drop", status="active", tier_multiplier=1.0
-    ))
+    client._cache["keep"] = (
+        0.0,
+        TrustInfo(passport_number="keep", status="active", tier_multiplier=1.0),
+    )
+    client._cache["drop"] = (
+        0.0,
+        TrustInfo(passport_number="drop", status="active", tier_multiplier=1.0),
+    )
     client.invalidate("drop")
     assert "keep" in client._cache
     assert "drop" not in client._cache

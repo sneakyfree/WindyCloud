@@ -314,7 +314,7 @@ def _storage_plans() -> list[StoragePlan]:
                 storage_bytes=quotas[tier],
                 storage_display=_human_bytes(quotas[tier]),
                 price_cents_per_month=price,
-                price_display="Free" if price == 0 else f"${price/100:.0f}/mo",
+                price_display="Free" if price == 0 else f"${price / 100:.0f}/mo",
             )
         )
     return plans

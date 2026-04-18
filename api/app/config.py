@@ -14,9 +14,9 @@ class Settings(BaseSettings):
     # any signed token from the JWKS (pre-Wave-7 behaviour). Set these in
     # prod to reject tokens minted for another product/audience even if
     # signed by the same hub — prevents cross-product token confusion.
-    windy_cloud_expected_audience: str = ""       # expected `aud` claim
-    windy_pro_expected_issuer: str = ""           # expected `iss` for Pro tokens
-    eternitas_expected_issuer: str = ""           # expected `iss` for Eternitas tokens
+    windy_cloud_expected_audience: str = ""  # expected `aud` claim
+    windy_pro_expected_issuer: str = ""  # expected `iss` for Pro tokens
+    eternitas_expected_issuer: str = ""  # expected `iss` for Eternitas tokens
 
     # Eternitas Trust API (Wave 3/4 — passport trust-tier lookups)
     # Default 8500 per Wave 4 spec. See deploy/docs/env-vars.md for prod.
@@ -78,14 +78,14 @@ class Settings(BaseSettings):
     # Tier quotas (bytes) — Wave 2 contract #1. The canonical vocab:
     # free / pro / ultra / max. `PLAN_TIERS` in routes/billing.py reads
     # from these.
-    tier_quota_free: int = 5_368_709_120       # 5 GB
-    tier_quota_pro: int = 107_374_182_400      # 100 GB
+    tier_quota_free: int = 5_368_709_120  # 5 GB
+    tier_quota_pro: int = 107_374_182_400  # 100 GB
     tier_quota_ultra: int = 1_099_511_627_776  # 1 TB
-    tier_quota_max: int = 5_497_558_138_880    # 5 TB
+    tier_quota_max: int = 5_497_558_138_880  # 5 TB
 
     # Shared secrets for service-to-service calls
     identity_webhook_secret: str = ""  # HMAC secret for /webhooks/identity/created
-    service_token: str = ""            # X-Service-Token for internal callers
+    service_token: str = ""  # X-Service-Token for internal callers
 
     # Windy Chat push-gateway (Wave 8 — grandma-ribbon first-backup notification)
     chat_push_gateway_url: str = ""
