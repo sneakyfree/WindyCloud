@@ -101,12 +101,29 @@ def create_app() -> FastAPI:
 
     app.add_middleware(RateLimitMiddleware, requests_per_minute=120)
 
+    # GAP G24: tighten CORS. `allow_origins=[...]` with `allow_credentials=True`
+    # and wildcard methods/headers is a "any origin we reflect can send
+    # credentials" policy — CSRF-with-credentials hazard. Pin to the
+    # specific methods / headers the dashboard + SDKs actually use.
     app.add_middleware(
         CORSMiddleware,
         allow_origins=settings.cors_origins_list,
         allow_credentials=True,
-        allow_methods=["*"],
-        allow_headers=["*"],
+        allow_methods=["GET", "POST", "PUT", "DELETE", "OPTIONS"],
+        allow_headers=[
+            "Authorization",
+            "Content-Type",
+            "X-Service-Token",
+            "X-Windy-Signature",
+            "X-Eternitas-Signature",
+            "X-Eternitas-Event",
+            "X-Eternitas-Timestamp",
+            "X-Eternitas-Delivery",
+        ],
+        expose_headers=[
+            "X-Storage-Warning",
+        ],
+        max_age=600,
     )
 
     # Routers
