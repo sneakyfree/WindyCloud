@@ -1,4 +1,4 @@
-# Wave 7 — Bucket B parked
+# Wave 7 — parked PRs
 
 ## [#4 — G10 gate init_db create_all on dev_mode](https://github.com/sneakyfree/WindyCloud/pull/4)
 
@@ -44,3 +44,41 @@ merge.
 **Grant's call (2026-04-17):** park for now, don't panic-patch in this
 session. G10 is a prod-correctness fix (Alembic race), worth doing
 right. The rest of Bucket B continues without it.
+
+---
+
+## [#10 — G7 optional JWT aud/iss validation](https://github.com/sneakyfree/WindyCloud/pull/10)
+
+**Parked during the Wave 7 Bucket C batch merge.**
+
+**What failed.** Merged successfully (commit `02c23f4`) but
+post-merge the G5 drift test (`test_wave7_g5_env_drift.py::
+test_every_settings_field_is_in_env_example`) caught that #10 added
+three new `Settings` fields (`windy_cloud_expected_audience`,
+`windy_pro_expected_issuer`, `eternitas_expected_issuer`) without
+backfilling `.env.example`. Main reverted to `c66f99c`.
+
+**Root cause.** Not a production-code bug — the G7 change is correct
+and defaults-off. The miss is that G5's drift test (landed earlier in
+this batch at `e1bd1db`) is the contract: any new `Settings` field
+must appear in `.env.example`. #10 was written before the drift test
+landed and didn't get updated on rebase.
+
+**What needs to change before re-merging.** One commit on the
+`wave-7-fix-g7-jwt-aud-iss` branch: add three lines to `.env.example`
+under the `[Auth]` section:
+
+```
+# Optional audience / issuer enforcement (Wave 7 G7). Empty = off,
+# matches pre-Wave-7 behaviour; set in prod once windy-pro + Eternitas
+# agree on canonical aud / iss values.
+WINDY_CLOUD_EXPECTED_AUDIENCE=
+WINDY_PRO_EXPECTED_ISSUER=
+ETERNITAS_EXPECTED_ISSUER=
+```
+
+Then force-push, rebase, re-merge. 5-minute fix, not a rewrite.
+
+**Halt behaviour during this batch:** per Grant's "Halt on regression"
+instruction for Bucket C, I stopped and surfaced rather than
+continuing to #12/#15/#11/#19.
