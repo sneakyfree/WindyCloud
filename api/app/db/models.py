@@ -51,9 +51,17 @@ class UserPlan(Base):
     quota_bytes: Mapped[int] = mapped_column(BigInteger, default=524_288_000)
     frozen: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
     trust_multiplier_at_allocation: Mapped[float | None] = mapped_column(Float, nullable=True)
+    # Wave 12 C-2 — Stripe billing state. Mirrors subscription.status
+    # (active | past_due | canceled | unpaid | trialing) so middleware
+    # can gate uploads on unpaid accounts without a Stripe round-trip.
+    billing_status: Mapped[str] = mapped_column(String(20), default="active", nullable=False)
+    stripe_customer_id: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    stripe_subscription_id: Mapped[str | None] = mapped_column(String(64), nullable=True)
     updated_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), default=lambda: datetime.now(timezone.utc)
     )
+
+    __table_args__ = (Index("ix_user_plans_stripe_customer", "stripe_customer_id"),)
 
 
 class IdentityBridge(Base):
@@ -212,3 +220,26 @@ class ServerRecord(Base):
     terminated_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
 
     __table_args__ = (Index("ix_servers_identity", "identity_id"),)
+
+
+class WebhookDelivery(Base):
+    """Inbound webhook idempotency ledger (Wave 12 C-2).
+
+    One row per (provider, event_id). A PK constraint on (provider,
+    event_id) is the primary dedupe mechanism — Stripe redelivers
+    retry-eligible events at least once more, and the in-process
+    passport/trust dedupe cache only survives for the uvicorn worker's
+    lifetime. Persisting here means a redeploy mid-retry still 200s
+    cleanly on the second delivery.
+    """
+
+    __tablename__ = "webhook_deliveries"
+
+    provider: Mapped[str] = mapped_column(String(20), primary_key=True)
+    event_id: Mapped[str] = mapped_column(String(128), primary_key=True)
+    event_type: Mapped[str] = mapped_column(String(64), nullable=False)
+    received_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=lambda: datetime.now(timezone.utc)
+    )
+
+    __table_args__ = (Index("ix_webhook_deliveries_received", "provider", "received_at"),)

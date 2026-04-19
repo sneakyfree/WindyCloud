@@ -25,7 +25,9 @@ _EXEMPT = {
     "/health/full",  # Internal-only (post-G31)
     "/api/v1/webhooks/identity/created",  # In the "Webhooks (inbound)" block
     "/api/v1/webhooks/passport/revoked",
+    "/api/v1/webhooks/passport/reinstated",
     "/api/v1/webhooks/trust/changed",
+    "/api/v1/webhooks/stripe",
     "/api/v1/identity/link-passport",  # In the "Identity bridge" block
 }
 

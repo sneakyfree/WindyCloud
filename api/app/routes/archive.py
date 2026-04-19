@@ -24,6 +24,7 @@ from api.app.models.storage import (
     MigrateResponse,
     MigrateResult,
 )
+from api.app.services.quota import check_quota
 from api.app.utils.upload import read_bounded
 
 logger = logging.getLogger(__name__)
@@ -123,6 +124,12 @@ async def _do_archive_upload(
 
     # GAP G2 — bounded chunked read, 413 on overflow before allocating.
     data = await read_bounded(file, settings.max_upload_size)
+
+    # GAP C-1 (Wave 12) — enforce UserPlan quota here too. Pre-Wave-12
+    # the /archive/* path skipped this check, letting service-token
+    # callers (chat/mail/word/fly/code backups) push past a user's
+    # paid-for quota. Shared helper keeps storage + archive identical.
+    await check_quota(db, identity_id=user.identity_id, additional_bytes=len(data))
 
     try:
         extra = json.loads(metadata) if metadata else {}

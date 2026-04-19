@@ -158,7 +158,9 @@ GET    /api/v1/identity/by-passport/{passport}    Resolve passport to identity
 ```
 POST   /api/v1/webhooks/identity/created   Windy Pro → provisions a UserPlan (HMAC)
 POST   /api/v1/webhooks/passport/revoked   Eternitas → freezes plan (ES256)
+POST   /api/v1/webhooks/passport/reinstated Eternitas → un-freezes plan (ES256)
 POST   /api/v1/webhooks/trust/changed      Eternitas → flushes local trust cache (HMAC)
+POST   /api/v1/webhooks/stripe             Stripe → subscription + invoice events (Stripe-Signature)
 ```
 
 ## Trust API integration (Wave 4)

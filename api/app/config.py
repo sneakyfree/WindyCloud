@@ -91,6 +91,15 @@ class Settings(BaseSettings):
     chat_push_gateway_url: str = ""
     chat_push_service_token: str = ""
 
+    # Stripe billing (Wave 12 C-2). Leave blank in dev — the webhook
+    # returns 503 until the secret is configured. Price IDs map
+    # subscription.items[].price.id → UserPlan.tier.
+    stripe_webhook_secret: str = ""
+    stripe_secret_key: str = ""
+    stripe_price_id_pro: str = ""
+    stripe_price_id_ultra: str = ""
+    stripe_price_id_max: str = ""
+
     # Sentry
     sentry_dsn: str = ""
 
@@ -163,7 +172,17 @@ class Settings(BaseSettings):
             return self.r2_endpoint
         return f"https://{self.r2_account_id}.r2.cloudflarestorage.com"
 
-    model_config = {"env_file": ".env", "env_file_encoding": "utf-8"}
+    # Wave 12 M-5 — `extra="ignore"` lets a single `.env` satisfy both
+    # `docker-compose.yml` (which reads POSTGRES_PASSWORD etc.) and the
+    # app's pydantic Settings. Wave 11 hardening flagged that under the
+    # pre-Wave-12 default (`extra="forbid"`) any extra var in `.env`
+    # aborted startup with `extra_forbidden`, so compose + the app
+    # couldn't share the file.
+    model_config = {
+        "env_file": ".env",
+        "env_file_encoding": "utf-8",
+        "extra": "ignore",
+    }
 
 
 settings = Settings()

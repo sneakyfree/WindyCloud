@@ -321,8 +321,115 @@ async def handle_passport_revoked(
 
 
 # ---------------------------------------------------------------------------
-# Shared helper — also used by the identity/link-passport route.
+# POST /webhooks/passport/reinstated  (Wave 12 H-3 — mirrors revoked)
 # ---------------------------------------------------------------------------
+
+
+class PassportReinstatedPayload(BaseModel):
+    """Eternitas reinstate payload — structurally identical to the
+    revoke payload; we keep the models separate so future divergence
+    (e.g. a `reinstate_reason` enum) doesn't force a migration of the
+    revoke schema."""
+
+    token: str | None = None
+    passport_number: str | None = None
+    reason: str | None = None
+    event: str | None = None
+    timestamp: str | None = None
+
+
+@router.post("/passport/reinstated", status_code=status.HTTP_200_OK)
+@crash_safe_webhook
+async def handle_passport_reinstated(
+    payload: PassportReinstatedPayload,
+    db: AsyncSession = Depends(get_db),
+) -> dict[str, Any]:
+    """Un-freeze the account tied to a reinstated passport.
+
+    Mirror of /passport/revoked. Verifies the ES256-signed JWT against
+    the Eternitas JWKS, looks up the identity via the bridge, and
+    clears UserPlan.frozen. No-op (with an informational return) when
+    the bridge / plan rows don't exist — reinstates for passports we
+    never heard of are a valid edge case after a reseed.
+
+    Wave 11 hardening flagged the missing counterpart (H-3); once
+    Eternitas revoked a passport, the only way back was a direct
+    UPDATE user_plans SET frozen=false.
+    """
+    if not payload.token:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Missing signed token",
+        )
+
+    try:
+        validator = get_eternitas_validator()
+        claims = validator.validate_token(payload.token)
+    except pyjwt.InvalidTokenError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail=f"Invalid Eternitas signature: {exc}",
+        ) from exc
+
+    passport = (
+        claims.get("passport_number")
+        or claims.get("passport")
+        or claims.get("sub")
+        or payload.passport_number
+    )
+    if not passport:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Token missing passport claim",
+        )
+
+    bridge_row = await db.execute(
+        select(IdentityBridge).where(IdentityBridge.passport_number == passport)
+    )
+    bridge = bridge_row.scalar_one_or_none()
+    if bridge is None:
+        logger.warning("passport.reinstated: no bridge row for passport=%s", passport)
+        return {"status": "unknown_passport", "passport_number": passport}
+
+    plan_row = await db.execute(
+        select(UserPlan).where(UserPlan.identity_id == bridge.windy_identity_id)
+    )
+    plan = plan_row.scalar_one_or_none()
+    if plan is None:
+        # Reinstate is a no-op when there's no plan to unfreeze;
+        # don't create a plan row here — allocate_plan + the
+        # identity/created webhook are the only routes that mint
+        # UserPlans.
+        logger.info(
+            "passport.reinstated: no UserPlan yet for identity=%s passport=%s — ignoring",
+            bridge.windy_identity_id,
+            passport,
+        )
+        return {
+            "status": "no_plan",
+            "windy_identity_id": bridge.windy_identity_id,
+            "passport_number": passport,
+        }
+
+    was_frozen = plan.frozen
+    plan.frozen = False
+    plan.updated_at = datetime.now(timezone.utc)
+    await db.commit()
+
+    logger.info(
+        "passport.reinstated unfroze identity=%s passport=%s was_frozen=%s reason=%s",
+        bridge.windy_identity_id,
+        passport,
+        was_frozen,
+        claims.get("reason") or payload.reason,
+    )
+    return {
+        "status": "reinstated",
+        "windy_identity_id": bridge.windy_identity_id,
+        "passport_number": passport,
+        "was_frozen": was_frozen,
+    }
+
 
 # ---------------------------------------------------------------------------
 # POST /webhooks/trust/changed  (Wave 4 — cache invalidation)
