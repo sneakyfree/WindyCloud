@@ -91,6 +91,15 @@ class Settings(BaseSettings):
     chat_push_gateway_url: str = ""
     chat_push_service_token: str = ""
 
+    # Stripe billing (Wave 12 C-2). Leave blank in dev — the webhook
+    # returns 503 until the secret is configured. Price IDs map
+    # subscription.items[].price.id → UserPlan.tier.
+    stripe_webhook_secret: str = ""
+    stripe_secret_key: str = ""
+    stripe_price_id_pro: str = ""
+    stripe_price_id_ultra: str = ""
+    stripe_price_id_max: str = ""
+
     # Sentry
     sentry_dsn: str = ""
 

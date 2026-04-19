@@ -52,9 +52,7 @@ async def check_quota(
     inside the same request, and there's no schema churn if FileRecord
     gains / loses fields.
     """
-    plan_row = await db.execute(
-        select(UserPlan).where(UserPlan.identity_id == identity_id)
-    )
+    plan_row = await db.execute(select(UserPlan).where(UserPlan.identity_id == identity_id))
     plan = plan_row.scalar_one_or_none()
     quota = plan.quota_bytes if plan else settings.default_storage_quota
 
