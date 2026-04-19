@@ -265,14 +265,47 @@ Phase 4 (`windy-chat`) consumes:
 
 ---
 
-## Deploy log
+## Deploy log — Wave 13 Phase 3 gated FIRE (2026-04-19)
 
-_Fill in at apply time — keeps a permanent record of the prod values
-even if Terraform state moves._
+The gated FIRE ran directly with `aws` CLI against the existing shared
+VPC (`vpc-011cc35a43403f9ef`), **not** via `terraform apply`. The
+Terraform module in `deploy/terraform/` remains Wave-14 work
+(refactor to consume the existing VPC as data blocks).
 
-- `terraform apply` at: `_____ UTC`
-- EIP: `_____`
-- RDS endpoint: `_____`
-- DNS choice: `A` (GoDaddy manual) | `B` (migrated to Cloudflare on `____`)
-- Certbot cert expires: `_____`
-- First smoke-test pass at: `_____ UTC`
+| Gate | Outcome |
+|---|---|
+| 0 preflight | STS ✓, Phase 1 JWKS 200, Phase 2 JWKS 200, `HMAC_WINDY_CLOUD` recovered from `~/.eternitas-phase2-state` |
+| 1 RDS | `windy-cloud-billing` db.t3.micro Postgres 16.4, endpoint `windy-cloud-billing.cqxekagcetpz.us-east-1.rds.amazonaws.com:5432`, `windy-prod-private` subnet group, `sg-07b8a5a208aa32951` |
+| 2 EC2 + IAM | Instance `i-070327df339182f68`, us-east-1a, AMI `ami-009d9173b44d0482b`, IAM role `windy-cloud-api` with inline `windy-cloud-api-user-vps` policy tag-scoped to `Product=user-vps`, EIP **`32.193.70.195`** |
+| 3 DNS | Cloudflare A `cloud.windyword.ai` → `32.193.70.195`, zone `86085f0869c360f79fef22db2b4b9b60`, record `d227d0b7ed7546e466ccb04618ba9e64`, proxied=false |
+| 4 deploy + TLS + smoke | Container up, /health 200, TLS live until 2026-07-18, all 7 smoke probes pass |
+
+**Bug-pattern mitigations that triggered at fire time:**
+
+- **AppleDouble metadata** — macOS `._*` files rode along in the initial `tar` and poisoned `alembic/versions/` with null bytes. Fixed on-host by `find . -name "._*" -delete` + image rebuild. Future scp'd bundles from macOS operators should use `COPYFILE_DISABLE=1 tar` or GNU tar to skip these.
+- **Bug #1 (uv COPY order)** — did not apply (local `docker build` preflight clean).
+- **Bug #3 (compose `${VAR}` expansion)** — worked around by writing a prod-only `docker-compose.prod.yml` that doesn't reference shell-expanded vars; all runtime config from `.env` via `env_file:`.
+- **Bug #4 (nginx site before certbot)** — nginx site `/etc/nginx/sites-available/cloud.windyword.ai` was enabled + `nginx -t && systemctl reload` ran **before** `certbot --nginx`. Certbot modified our server block (confirmed in certbot output), not `default`.
+- **Bug #5 (private repo)** — skipped the `user_data curl` path entirely. Bundle was scp'd directly from the operator machine.
+
+**Known gaps carried forward (not blockers):**
+
+- `STRIPE_WEBHOOK_SECRET` unset → `/webhooks/stripe` returns 503 "secret not configured" until Grant pastes from the Stripe dashboard. Endpoint itself works; secret-gate is the correct pre-configured behavior.
+- `R2_*` all unset → `LocalDiskProvider` fallback (per `r2_misconfiguration_reason` == None when nothing is set). `/health/full` reports `storage_provider: local_disk`. Populate R2 keys in `.env` + restart when Grant is ready.
+- `IDENTITY_WEBHOOK_SECRET` minted fresh (32-byte hex) and stored in `~/.windy-cloud-phase3-state`. Phase 1 (`windy-pro`) must be updated with this secret for `/webhooks/identity/created` to verify signatures.
+- `SERVICE_TOKEN` minted fresh. Share with ecosystem peers (`windy-chat`, `windy-mail`, etc.) as they come online.
+
+**Deploy-log values (authoritative):**
+
+- EIP: **`32.193.70.195`**
+- RDS: `windy-cloud-billing.cqxekagcetpz.us-east-1.rds.amazonaws.com`
+- DNS: `cloud.windyword.ai` (Cloudflare, `proxied=false`)
+- Cert expires: **2026-07-18**
+- Smoke pass: 2026-04-19 UTC
+
+**Post-deploy Grant to-do (Phase 3 hand-off):**
+
+- [ ] Update Eternitas `subscribers` table — set `windycloud` to point at `https://cloud.windyword.ai/webhooks/eternitas` (per your Phase 3 paste).
+- [ ] Update Phase 1 (`windy-pro`) subscribers to share `IDENTITY_WEBHOOK_SECRET` from `~/.windy-cloud-phase3-state`.
+- [ ] Paste `STRIPE_WEBHOOK_SECRET` into `/opt/windy-cloud/.env` + `docker compose restart cloud` when the Stripe dashboard is wired.
+- [ ] Populate R2 keys (`R2_ACCESS_KEY_ID`, `R2_SECRET_ACCESS_KEY`) in `.env` + restart when you want to move off LocalDiskProvider.
