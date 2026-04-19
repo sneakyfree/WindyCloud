@@ -27,6 +27,7 @@ from api.app.models.storage import (
     UploadResponse,
     UsageResponse,
 )
+from api.app.services.quota import check_quota
 from api.app.tasks.analytics import track_event
 from api.app.utils.upload import read_bounded
 
@@ -84,23 +85,8 @@ async def _do_upload(
     # Chunked read — raises 413 mid-stream if max_upload_size is exceeded.
     data = await read_bounded(file, settings.max_upload_size)
 
-    # Get user's plan quota (or fall back to global default)
-    plan_result = await db.execute(select(UserPlan).where(UserPlan.identity_id == user.identity_id))
-    user_plan = plan_result.scalar_one_or_none()
-    quota = user_plan.quota_bytes if user_plan else settings.default_storage_quota
-
-    # Check quota
-    usage_row = await db.execute(
-        select(func.coalesce(func.sum(FileRecord.size_bytes), 0)).where(
-            FileRecord.identity_id == user.identity_id
-        )
-    )
-    current_usage = usage_row.scalar() or 0
-    if current_usage + len(data) > quota:
-        raise HTTPException(
-            status_code=status.HTTP_507_INSUFFICIENT_STORAGE,
-            detail="Storage quota exceeded. Upgrade your plan for more space.",
-        )
+    # Shared with /archive/* post-Wave-12 (GAP C-1). See services/quota.py.
+    await check_quota(db, identity_id=user.identity_id, additional_bytes=len(data))
 
     filename = _sanitize_filename(file.filename or f"{uuid.uuid4()}")
     content_type = file.content_type or "application/octet-stream"

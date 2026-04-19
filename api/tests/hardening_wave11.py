@@ -70,31 +70,28 @@ async def test_storage_upload_rejects_oversized_single_request(client):
 
 
 @pytest.mark.asyncio
-async def test_archive_upload_bypasses_user_plan_quota(client):
-    """FINDING — /archive/* endpoints do NOT check UserPlan.quota_bytes.
+async def test_archive_upload_respects_user_plan_quota(client):
+    """Wave 12 C-1 regression guard.
 
-    Only the per-request MAX_UPLOAD_SIZE guards them. A service-token
-    caller (agent, mail, word) can push past the user's plan quota
-    unchecked. This test documents the current behavior so the
-    divergence doesn't silently regress further; the fix belongs in
-    Wave 12.
+    Pre-Wave-12 /archive/* endpoints skipped the quota check. Wave 12
+    lifts the check into `services/quota.py::check_quota` and calls
+    it from both /storage/upload and the archive handler. The 507
+    assertion here pins the fix so an accidental refactor that drops
+    the call from one path trips immediately.
     """
     from api.app.config import settings
 
     original = settings.default_storage_quota
     settings.default_storage_quota = 1024  # 1 KB quota — tiny
     try:
-        # First push 2 KB — already over a 1 KB quota.
         r = await client.post(
             "/api/v1/archive/chat",
             files={"file": ("a.bin", b"x" * 2048, "application/octet-stream")},
             data={"metadata": "{}"},
             headers={"Authorization": "Bearer fake"},
         )
-        # Today: the archive path accepts it. If this starts failing
-        # with 507, flip the assertion — that's progress, not a test bug.
-        assert r.status_code == 200, (
-            f"Expected archive path to accept past-quota upload (known bypass). "
+        assert r.status_code == 507, (
+            f"Wave 12 regression — /archive/* is not checking quota again. "
             f"Got {r.status_code}: {r.text}"
         )
     finally:
