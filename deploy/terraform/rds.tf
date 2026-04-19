@@ -24,11 +24,11 @@ resource "aws_db_instance" "main" {
   vpc_security_group_ids = [aws_security_group.db.id]
   publicly_accessible    = false
 
-  backup_retention_period = 7
-  backup_window           = "08:00-09:00" # UTC — off-peak for us-west-2
-  maintenance_window      = "Mon:09:30-Mon:10:30"
-  deletion_protection     = true
-  skip_final_snapshot     = false
+  backup_retention_period   = 7
+  backup_window             = "08:00-09:00" # UTC — off-peak for us-west-2
+  maintenance_window        = "Mon:09:30-Mon:10:30"
+  deletion_protection       = true
+  skip_final_snapshot       = false
   final_snapshot_identifier = "windy-cloud-final-${formatdate("YYYYMMDDhhmmss", timestamp())}"
 
   # Multi-AZ is off at launch; flip to true after real revenue.
