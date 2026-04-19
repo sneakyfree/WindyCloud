@@ -1,0 +1,63 @@
+# Wave 13 Phase 3 — production values from the Wave 13 deploy
+# playbook (~/wave13-deploy-prompts.md §Shared deployment context).
+#
+# Usage:
+#   cp prod.tfvars.example prod.tfvars
+#   # edit prod.tfvars — fill in ssh_public_key + db_password
+#   terraform plan -var-file=prod.tfvars
+#
+# IMPORTANT — this module (Wave 9) still provisions its own VPC + SGs.
+# Phase 3 targets the pre-existing TheWindstorm VPC + shared SGs
+# below. Before `terraform apply` against prod:
+#
+#   1. Either migrate network.tf to *data* sources that read the
+#      existing VPC/subnets/SGs by ID, OR
+#   2. Apply only the compute/rds/iam files against these IDs and
+#      skip network.tf entirely via `-target=`.
+#
+# docs/WAVE13_PHASE3_RUNBOOK.md has the detailed playbook.
+
+aws_region  = "us-east-1"
+environment = "prod"
+
+# Compute
+instance_type  = "t3.small"   # Playbook §Phase 3 sizing
+ami_id         = "ami-0c101f26f147fa7fd" # Ubuntu 24.04 LTS, us-east-1 (verify before apply)
+domain         = "api.windycloud.com"
+
+# TheWindstorm VPC + subnets (Phase 3 playbook)
+# vpc_id            = "vpc-011cc35a43403f9ef"
+# public_subnet_1a  = "subnet-03fcb275dd93b93a4"
+# public_subnet_1b  = "subnet-0da5d289ccead1b2d"
+# private_subnet_1a = "subnet-01886b38e0ab2092a"
+# private_subnet_1b = "subnet-0ea84d719634c9411"
+#
+# Note — these vars don't exist in the current module; they're
+# written here as the *intended* inputs for the network.tf rewrite.
+
+# Shared SGs (will replace the module-provisioned ones once
+# network.tf is rewritten to consume existing SGs):
+# alb_sg_id   = "sg-0316d747027128a48"
+# web_sg_id   = "sg-05024168bf3105182"
+# rds_sg_id   = "sg-07b8a5a208aa32951"
+# admin_sg_id = "sg-0f70b0451e92558a2"
+
+# RDS
+db_instance_class       = "db.t3.micro" # Playbook §Phase 3 sizing
+db_allocated_storage_gb = 20
+
+# Bastion CIDR — tighten to your VPN / office IP before apply.
+bastion_cidr = "0.0.0.0/0"
+
+# R2 bucket is provisioned out-of-band (Cloudflare account, not AWS).
+# The name is pinned here so outputs / IAM comments stay aligned.
+r2_bucket_name = "windycloud-userdata"
+
+# GitHub repo that OIDC-assumes the deploy role.
+github_repository = "sneakyfree/WindyCloud"
+
+# SECRET — inject via `-var="db_password=$(...)"` or TF_VAR_db_password.
+# db_password = "fill-in-at-apply-time"
+
+# SECRET — path via `-var="ssh_public_key=$(cat ~/windy-prod-key.pub)"`.
+# ssh_public_key = "ssh-ed25519 ..."
