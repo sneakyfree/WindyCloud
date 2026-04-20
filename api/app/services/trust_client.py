@@ -111,12 +111,9 @@ class TrustInfo:
 # Client
 # ---------------------------------------------------------------------------
 
-<<<<<<< HEAD
-=======
 def _trust_cache_key(passport_number: str) -> str:
     return f"trust:{passport_number}"
 
->>>>>>> 3b26875 (fix(G6): Redis-backed trust cache + webhook dedup)
 
 class TrustClient:
     """Async Eternitas Trust API client fronted by a shared CacheBackend."""
