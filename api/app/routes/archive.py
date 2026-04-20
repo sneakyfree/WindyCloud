@@ -105,10 +105,13 @@ async def _archive_upload(
     metadata: str,
     user: AuthenticatedUser,
     db: AsyncSession,
+    filename_override: str | None = None,
 ) -> ArchiveResponse:
     """Shared logic for all archive endpoints."""
     async with _upload_semaphore:
-        return await _do_archive_upload(archive_key, file, metadata, user, db)
+        return await _do_archive_upload(
+            archive_key, file, metadata, user, db, filename_override
+        )
 
 
 async def _do_archive_upload(
@@ -117,6 +120,7 @@ async def _do_archive_upload(
     metadata: str,
     user: AuthenticatedUser,
     db: AsyncSession,
+    filename_override: str | None = None,
 ) -> ArchiveResponse:
     config = ARCHIVE_TYPES[archive_key]
     product = config["product"]
@@ -139,7 +143,13 @@ async def _do_archive_upload(
     retention_count = extra.get("retention_count")
     retention_days = extra.get("retention_days")
 
-    filename = _sanitize_filename(file.filename or f"{file_type}_{uuid.uuid4()}")
+    # Wave 14 P3 (smoke §5): when the caller sends `-F filename=X` alongside
+    # the multipart file, honour `X` — the client has renamed the upload
+    # on purpose, typically to match a stable key they'll retrieve later
+    # via /archive/retrieve/{product}/X. Falls back to the multipart
+    # filename, then to a uuid-stamped default.
+    raw_name = filename_override or file.filename or f"{file_type}_{uuid.uuid4()}"
+    filename = _sanitize_filename(raw_name)
     content_type = file.content_type or "application/octet-stream"
 
     provider = _get_provider()
@@ -187,50 +197,55 @@ async def _do_archive_upload(
 async def archive_chat(
     file: UploadFile = File(...),
     metadata: str = Form('{"encrypted": true, "retention_count": 7}'),
+    filename: str | None = Form(None),
     user: AuthenticatedUser = Depends(get_user_or_service),
     db: AsyncSession = Depends(get_db),
 ):
-    return await _archive_upload("chat", file, metadata, user, db)
+    return await _archive_upload("chat", file, metadata, user, db, filename)
 
 
 @router.post("/mail", response_model=ArchiveResponse)
 async def archive_mail(
     file: UploadFile = File(...),
     metadata: str = Form('{"retention_days": 90}'),
+    filename: str | None = Form(None),
     user: AuthenticatedUser = Depends(get_user_or_service),
     db: AsyncSession = Depends(get_db),
 ):
-    return await _archive_upload("mail", file, metadata, user, db)
+    return await _archive_upload("mail", file, metadata, user, db, filename)
 
 
 @router.post("/agent", response_model=ArchiveResponse)
 async def archive_agent(
     file: UploadFile = File(...),
     metadata: str = Form("{}"),
+    filename: str | None = Form(None),
     user: AuthenticatedUser = Depends(get_user_or_service),
     db: AsyncSession = Depends(get_db),
 ):
-    return await _archive_upload("agent", file, metadata, user, db)
+    return await _archive_upload("agent", file, metadata, user, db, filename)
 
 
 @router.post("/recordings", response_model=ArchiveResponse)
 async def archive_recordings(
     file: UploadFile = File(...),
     metadata: str = Form("{}"),
+    filename: str | None = Form(None),
     user: AuthenticatedUser = Depends(get_user_or_service),
     db: AsyncSession = Depends(get_db),
 ):
-    return await _archive_upload("recordings", file, metadata, user, db)
+    return await _archive_upload("recordings", file, metadata, user, db, filename)
 
 
 @router.post("/code-settings", response_model=ArchiveResponse)
 async def archive_code_settings(
     file: UploadFile = File(...),
     metadata: str = Form("{}"),
+    filename: str | None = Form(None),
     user: AuthenticatedUser = Depends(get_user_or_service),
     db: AsyncSession = Depends(get_db),
 ):
-    return await _archive_upload("code-settings", file, metadata, user, db)
+    return await _archive_upload("code-settings", file, metadata, user, db, filename)
 
 
 @router.post(
