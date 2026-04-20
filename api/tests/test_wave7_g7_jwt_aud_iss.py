@@ -118,19 +118,26 @@ def test_expired_token_still_rejected_regardless_of_aud_config():
 
 def test_settings_plumbing_passes_values_to_validators(monkeypatch):
     """get_pro_validator / get_eternitas_validator read settings and
-    pass them through. Empty settings → no enforcement; non-empty →
-    constructor receives them."""
+    pass them through.
+
+    Wave 14 changed Pro's plumbing:
+      - audience is forced to "" (Pro doesn't emit `aud`);
+      - issuer is unioned with the transitional `windy-identity` value.
+    Eternitas plumbing is unchanged from Wave 7.
+    """
     from api.app.auth import jwks as jwks_mod
     from api.app.config import settings
 
     monkeypatch.setattr(settings, "windy_cloud_expected_audience", "windy-cloud")
-    monkeypatch.setattr(settings, "windy_pro_expected_issuer", "https://windyword.ai")
+    monkeypatch.setattr(settings, "windy_pro_expected_issuer", "https://api.windyword.ai")
     monkeypatch.setattr(settings, "eternitas_expected_issuer", "https://eternitas.ai")
     jwks_mod._reset_validators_for_testing()
 
     pro = jwks_mod.get_pro_validator()
-    assert pro._audience == "windy-cloud"
-    assert pro._issuer == "https://windyword.ai"
+    # Wave 14: aud enforcement off for Pro until Pro emits `aud` claim.
+    assert pro._audience is None
+    # Wave 14: issuer set is unioned with `windy-identity`.
+    assert pro._issuer == ["windy-identity", "https://api.windyword.ai"]
 
     et = jwks_mod.get_eternitas_validator()
     assert et._audience == "windy-cloud"
