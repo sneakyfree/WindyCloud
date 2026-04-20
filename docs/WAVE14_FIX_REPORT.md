@@ -16,12 +16,14 @@ batch-merge and restart the Cloud container in the morning.
 | — | — | PR #11 admin-merge left a `>>>>>>> 3b26875` conflict marker in trust_client.py; broke `pytest api/tests/` collection. | [#36](https://github.com/sneakyfree/WindyCloud/pull/36) | `wave14/precursor-merge-conflict` |
 | 1 | P0 | Pro→Cloud JWT contract mismatch; every real Pro login 401's. | [#37](https://github.com/sneakyfree/WindyCloud/pull/37) | `wave14/pr1-jwt-validator-loosen` |
 | 2 | P0 | Eternitas fans to `/webhooks/eternitas`, Cloud 404s there — revocations dead-letter. | [#38](https://github.com/sneakyfree/WindyCloud/pull/38) | `wave14/pr2-eternitas-dispatcher` |
-| 3a | P1 | `/api/v1/analytics/*` leaks fleet-wide aggregates to any authed user. | [#39](https://github.com/sneakyfree/WindyCloud/pull/39) | `wave14/pr3-batched-p1s` |
-| 3b | P1 | Zero security headers on any Cloud response (no HSTS/CSP/XFO/…). | #39 | same branch |
-| 3c | P1 | Host `CORS_ORIGINS` pinned to `https://cloud.windyword.ai` only — apex and sister subdomains blocked. | #39 | same branch |
+| 3a | P1 | `/api/v1/analytics/*` leaks fleet-wide aggregates to any authed user. | [#40](https://github.com/sneakyfree/WindyCloud/pull/40) | `wave14/pr3-batched-p1s` |
+| 3b | P1 | Zero security headers on any Cloud response (no HSTS/CSP/XFO/…). | #40 | same branch |
+| 3c | P1 | Host `CORS_ORIGINS` pinned to `https://cloud.windyword.ai` only — apex and sister subdomains blocked. | #40 | same branch |
 | 4 | P1 | Pro's own `/health` reports `windy_cloud: unreachable`. **Not fixed here** — filed as [windy-pro#50](https://github.com/sneakyfree/windy-pro/issues/50). | — | — |
 
 PRs stack in dependency order: precursor → PR1 → PR2 → PR3. Merge in that order for clean rebases, or admin-merge precursor first and let PR1/2/3 auto-rebase.
+
+> **Orthogonal parallel-session PR:** a parallel overnight session also opened PR [#39](https://github.com/sneakyfree/WindyCloud/pull/39) (`wave14/fix-pro-jwks-url-cloud-side`) flipping Cloud's default `WINDY_PRO_JWKS_URL` from the apex (which Cloudflare Access 401-gates) to `pro.windyword.ai`. Already merged to main as commit `f1a05fa`. It touches the same `Settings` class as this PR's 3c CORS change — they land on different fields, so the rebase is clean, but re-check on merge.
 
 ---
 
