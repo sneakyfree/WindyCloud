@@ -7,7 +7,15 @@ from pydantic_settings import BaseSettings
 
 class Settings(BaseSettings):
     # Auth
-    windy_pro_jwks_url: str = "https://windyword.ai/.well-known/jwks.json"
+    # Wave 14 P1-1 — previous default pointed at the windyword.ai apex,
+    # which is gated by a Cloudflare Access "Pre-Launch" Basic-Auth
+    # realm (HTTP 401 with `WWW-Authenticate: Basic realm="WindyWord
+    # Pre-Launch"`). Every Cloud-side JWT verify against a Pro-issued
+    # token failed because Cloud couldn't fetch the JWKS at all. The
+    # Wave 14 decision is to move Pro's public JWKS to a dedicated
+    # subdomain (`pro.windyword.ai`); override via WINDY_PRO_JWKS_URL
+    # env var while DNS is still being rolled out.
+    windy_pro_jwks_url: str = "https://pro.windyword.ai/.well-known/jwks.json"
     eternitas_jwks_url: str = "https://eternitas.ai/.well-known/eternitas-keys"
 
     # Optional audience / issuer validation (Wave 7 G7). Empty = accept
