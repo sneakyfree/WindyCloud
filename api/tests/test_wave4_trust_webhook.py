@@ -14,7 +14,16 @@ import time
 import pytest
 
 from api.app.config import settings
-from api.app.services.trust_client import TrustInfo, get_trust_client
+from api.app.services.cache_backend import (
+    InMemoryCacheBackend,
+    _reset_cache_backend_for_testing,
+)
+from api.app.services.trust_client import (
+    TrustInfo,
+    _reset_trust_client_for_testing,
+    _trust_cache_key,
+    get_trust_client,
+)
 
 WEBHOOK_SECRET = "wave4-trust-secret"
 
@@ -22,11 +31,13 @@ WEBHOOK_SECRET = "wave4-trust-secret"
 @pytest.fixture
 def trust_secret(monkeypatch):
     monkeypatch.setattr(settings, "eternitas_webhook_secret", WEBHOOK_SECRET)
-    # Also reset the dedupe set between tests so timestamps don't collide.
-    from api.app.routes import webhooks as wh
-
-    wh._seen_deliveries.clear()
-    return WEBHOOK_SECRET
+    # Fresh in-memory backend per test so dedupe + trust cache don't leak
+    # across cases. Matches the per-worker dev behaviour.
+    _reset_cache_backend_for_testing(InMemoryCacheBackend())
+    _reset_trust_client_for_testing()
+    yield WEBHOOK_SECRET
+    _reset_cache_backend_for_testing(None)
+    _reset_trust_client_for_testing()
 
 
 def _signed_delivery(payload: dict, secret: str = WEBHOOK_SECRET) -> tuple[bytes, dict]:
@@ -44,11 +55,14 @@ def _signed_delivery(payload: dict, secret: str = WEBHOOK_SECRET) -> tuple[bytes
 
 @pytest.mark.asyncio
 async def test_flushes_cache_on_valid_delivery(client, trust_secret):
-    cl = get_trust_client()
-    cl._cache["ET-FLUSH"] = (
-        time.monotonic(),
-        TrustInfo(passport_number="ET-FLUSH", status="active", tier_multiplier=1.0),
+    from api.app.services.cache_backend import get_cache_backend
+
+    backend = get_cache_backend()
+    cached = TrustInfo(
+        passport_number="ET-FLUSH", status="active", tier_multiplier=1.0
     )
+    await backend.set(_trust_cache_key("ET-FLUSH"), cached.to_bytes(), 300)
+    assert await backend.get(_trust_cache_key("ET-FLUSH")) is not None
 
     body, headers = _signed_delivery(
         {
@@ -62,7 +76,7 @@ async def test_flushes_cache_on_valid_delivery(client, trust_secret):
     resp = await client.post("/api/v1/webhooks/trust/changed", content=body, headers=headers)
     assert resp.status_code == 200, resp.text
     assert resp.json()["status"] == "invalidated"
-    assert "ET-FLUSH" not in cl._cache
+    assert await backend.get(_trust_cache_key("ET-FLUSH")) is None
 
 
 @pytest.mark.asyncio

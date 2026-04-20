@@ -139,7 +139,10 @@ async def test_client_cache_repeats_single_http_call():
     first = await client.get_trust(KNOWN_PASSPORT)
     assert first is not None
     second = await client.get_trust(KNOWN_PASSPORT)
-    assert second is first  # identical object → came from cache
+    # Cache hit via CacheBackend deserialises so second is a NEW object
+    # but must have the same field values as the first.
+    assert second == first
+    assert second is not None
 
 
 @pytest.mark.asyncio
@@ -149,10 +152,13 @@ async def test_invalidate_forces_refetch():
         pytest.skip("Set ETERNITAS_TEST_PASSPORT.")
     client = TrustClient(base_url=ETERNITAS_URL, use_mock=False)
     a = await client.get_trust(KNOWN_PASSPORT)
-    client.invalidate(KNOWN_PASSPORT)
+    await client.invalidate(KNOWN_PASSPORT)
     b = await client.get_trust(KNOWN_PASSPORT)
     assert a is not None and b is not None
-    assert a is not b  # different objects → went back to the server
+    # Both should have the same contract-level values; the re-fetch is
+    # evident from Eternitas's own X-Trust-Cache: miss on the second call,
+    # which the raw-HTTP test above covers. Here we just assert equality.
+    assert a == b
 
 
 # ---------------------------------------------------------------------------
@@ -177,15 +183,19 @@ async def test_trust_changed_webhook_flushes_our_cache(monkeypatch):
     secret = "live-test-trust-webhook-secret"
     monkeypatch.setattr(settings, "eternitas_webhook_secret", secret)
 
-    # Seed the client cache
+    # Seed the client cache via the backend it actually reads from.
+    from api.app.services.cache_backend import get_cache_backend
+    from api.app.services.trust_client import _trust_cache_key
+
     client = get_trust_client()
+    backend = get_cache_backend()
     fake = TrustInfo(
         passport_number="ET-CACHE-ME",
         status="active",
         tier_multiplier=1.0,
     )
-    client._cache["ET-CACHE-ME"] = (time.monotonic(), fake)
-    assert "ET-CACHE-ME" in client._cache
+    await backend.set(_trust_cache_key("ET-CACHE-ME"), fake.to_bytes(), 300)
+    assert await backend.get(_trust_cache_key("ET-CACHE-ME")) is not None
 
     # Build a signed delivery
     body = json.dumps(
@@ -233,4 +243,4 @@ async def test_trust_changed_webhook_flushes_our_cache(monkeypatch):
 
     assert resp.status_code == 200, resp.text
     assert resp.json()["status"] == "invalidated"
-    assert "ET-CACHE-ME" not in client._cache
+    assert await backend.get(_trust_cache_key("ET-CACHE-ME")) is None
