@@ -115,6 +115,29 @@ def _trust_cache_key(passport_number: str) -> str:
     return f"trust:{passport_number}"
 
 
+def _trust_lkg_key(passport_number: str) -> str:
+    """Last-known-good key — a longer-TTL shadow of the primary cache.
+
+    Pre-G6 the in-process dict served the stale entry when an upstream
+    refresh 5xx'd, so a flaky Eternitas didn't black-hole trust lookups.
+    G6 moved caching to Redis; Redis strictly honours TTLs and the
+    stale-on-5xx fail-soft went with it. Wave 14 restores that semantic
+    via this second keyspace — when the primary expires and the refresh
+    fetch fails, we fall back here. Successful fetches write to both;
+    `invalidate()` clears both (a trust.changed webhook means the
+    user's trust state changed for a policy reason, so even the LKG
+    is now wrong).
+    """
+    return f"trust:lkg:{passport_number}"
+
+
+# LKG TTL is a multiple of the primary cache TTL. Long enough to
+# survive a real Eternitas outage (typical multi-minute blip); short
+# enough that a stale trust tier can't linger for days after an
+# operator forgets to flush.
+_LKG_MULTIPLIER = 12
+
+
 class TrustClient:
     """Async Eternitas Trust API client fronted by a shared CacheBackend."""
 
@@ -137,15 +160,24 @@ class TrustClient:
     async def get_trust(self, passport_number: str) -> TrustInfo | None:
         """Return trust info for `passport_number`, or None if unknown.
 
-        Cache order:
-          1. CacheBackend (Redis in prod, in-memory in dev) — fleet-wide.
-          2. Live HTTP call to Eternitas if not cached.
-          3. Results are cached for min(ttl, response.cache_ttl_seconds).
+        Lookup order:
+          1. Primary cache (CacheBackend). Hit → return.
+          2. Live HTTP to Eternitas.
+          3. On 5xx / network error: last-known-good keyspace.
+             If an LKG exists, serve + log a warning. If not, return None.
+          4. 404 / 429 are NOT fail-soft: 404 means the passport was
+             explicitly removed (stale-serve would be wrong); 429 is the
+             caller's problem to back off — serving stale would obscure
+             the rate-limit signal.
+
+        Successful fetches write to BOTH keyspaces.
+        `invalidate()` clears BOTH keyspaces.
         """
         if not passport_number or self._use_mock:
             return None
 
         key = _trust_cache_key(passport_number)
+        lkg_key = _trust_lkg_key(passport_number)
 
         cached = await self._backend.get(key)
         if cached is not None:
@@ -164,14 +196,23 @@ class TrustClient:
             async with httpx.AsyncClient(timeout=self._timeout) as client:
                 resp = await client.get(url)
         except (httpx.HTTPError, OSError) as exc:
-            logger.warning("Trust lookup failed for %s: %s", passport_number, exc)
-            return None
+            logger.warning(
+                "Trust lookup failed for %s: %s — falling back to LKG",
+                passport_number, exc,
+            )
+            return await self._serve_lkg(lkg_key, passport_number)
 
         if resp.status_code == 404:
             return None
         if resp.status_code == 429:
             logger.warning("Trust API rate-limited on %s", passport_number)
             return None
+        if resp.status_code >= 500:
+            logger.warning(
+                "Trust lookup for %s returned %s — falling back to LKG",
+                passport_number, resp.status_code,
+            )
+            return await self._serve_lkg(lkg_key, passport_number)
         if resp.status_code != 200:
             logger.warning(
                 "Trust lookup for %s returned %s: %s",
@@ -184,15 +225,47 @@ class TrustClient:
         info = TrustInfo.from_response(resp.json())
         effective_ttl = min(self._ttl, info.cache_ttl_seconds or self._ttl)
         if effective_ttl > 0:
-            await self._backend.set(key, info.to_bytes(), effective_ttl)
+            # Write primary + LKG atomically-enough — if one write fails
+            # (Redis outage mid-request), the backend logs and moves on.
+            # Worst case: primary hit, LKG miss → next refresh on 5xx
+            # returns None instead of the prior stale value. That's the
+            # pre-Wave-14 degraded mode; no regression.
+            payload = info.to_bytes()
+            await self._backend.set(key, payload, effective_ttl)
+            await self._backend.set(lkg_key, payload, effective_ttl * _LKG_MULTIPLIER)
+        return info
+
+    async def _serve_lkg(
+        self, lkg_key: str, passport_number: str
+    ) -> TrustInfo | None:
+        """Return the last-known-good entry if present, else None."""
+        raw = await self._backend.get(lkg_key)
+        if raw is None:
+            return None
+        try:
+            info = TrustInfo.from_bytes(raw)
+        except (json.JSONDecodeError, TypeError, KeyError) as exc:
+            logger.warning("Corrupt LKG trust cache for %s: %s", passport_number, exc)
+            await self._backend.delete(lkg_key)
+            return None
+        logger.info(
+            "Trust fail-soft: serving stale LKG for %s (band=%s status=%s)",
+            passport_number, info.band, info.status,
+        )
         return info
 
     async def invalidate(self, passport_number: str) -> None:
-        """Drop the cached entry — call from the trust.changed webhook.
+        """Drop BOTH cached entries — call from the trust.changed webhook.
 
-        With the Redis backend this flushes for every worker at once.
+        A trust.changed event means the user's state changed for a policy
+        reason (band downgrade, suspension, clearance revocation).
+        Keeping the LKG in place would silently serve the old band on the
+        next upstream blip — that's the exact failure mode webhooks
+        exist to prevent. Flushing both keyspaces for every worker at
+        once is the whole reason G6 moved to Redis in the first place.
         """
         await self._backend.delete(_trust_cache_key(passport_number))
+        await self._backend.delete(_trust_lkg_key(passport_number))
 
     async def clear_cache(self) -> None:
         # Rarely needed — used in tests.

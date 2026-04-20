@@ -227,19 +227,11 @@ async def test_cache_hit_skips_http(monkeypatch):
     assert call_count["n"] == 1, f"Expected single HTTP call, got {call_count['n']}"
 
 
-@pytest.mark.xfail(
-    reason=(
-        "Wave 7 G6 (PR #11) replaced the in-process stale-on-5xx fail-soft "
-        "with Redis-backed fleet-wide invalidation. Redis honors TTLs strictly, "
-        "so once the entry expires, a 5xx returns None. Reinstating fail-soft "
-        "would need a second longer-TTL 'last-known-good' keyspace — design "
-        "call deferred post-launch."
-    ),
-    strict=False,
-)
 @pytest.mark.asyncio
 async def test_5xx_returns_stale_cache_when_available(monkeypatch):
-    """Once we've cached a good response, a later upstream outage returns the stale value."""
+    """Once we've cached a good response, a later upstream outage returns
+    the stale value via the last-known-good keyspace (Wave 14 PR5
+    restored this pre-G6 fail-soft semantic)."""
     responses = [
         # First call: OK
         (
