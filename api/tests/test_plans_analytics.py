@@ -4,6 +4,8 @@ from __future__ import annotations
 
 import pytest
 
+from api.app.config import settings
+
 
 @pytest.mark.asyncio
 async def test_get_plan_default_free(client):
@@ -86,9 +88,13 @@ async def test_upgraded_quota_enforced(client):
 
 
 @pytest.mark.asyncio
-async def test_analytics_daily(client):
-    """Analytics daily endpoint returns data."""
-    # Upload to generate an analytics event
+async def test_analytics_daily(client, monkeypatch):
+    """Analytics daily endpoint returns data (with admin-gate unlocked).
+
+    Wave 14 P1 gated these on require_admin; the default TEST_USER in
+    conftest isn't admin unless we add its identity to the allowlist.
+    """
+    monkeypatch.setattr(settings, "admin_identity_ids", "test-user-001")
     await client.post(
         "/api/v1/storage/upload",
         files={"file": ("test.txt", b"hello", "text/plain")},
@@ -106,8 +112,9 @@ async def test_analytics_daily(client):
 
 
 @pytest.mark.asyncio
-async def test_analytics_summary(client):
-    """Analytics summary aggregates all events."""
+async def test_analytics_summary(client, monkeypatch):
+    """Analytics summary aggregates all events (admin-gate unlocked)."""
+    monkeypatch.setattr(settings, "admin_identity_ids", "test-user-001")
     await client.post(
         "/api/v1/storage/upload",
         files={"file": ("test.txt", b"hello", "text/plain")},
