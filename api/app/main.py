@@ -132,6 +132,17 @@ def create_app() -> FastAPI:
 
     app.add_middleware(RateLimitMiddleware, requests_per_minute=120)
 
+    # Security headers (Wave 14 P1). Added after RequestLogging + RateLimit
+    # so the log / rate-limit middleware runs before the response headers
+    # are decorated, but before CORS so the security headers survive a
+    # preflight rewrite. Starlette applies middleware bottom-up during
+    # dispatch, so the order here means request hits SecurityHeaders last
+    # on the way in / first on the way out — i.e. it gets to stamp every
+    # response the app produces.
+    from api.app.middleware.security_headers import SecurityHeadersMiddleware
+
+    app.add_middleware(SecurityHeadersMiddleware)
+
     # GAP G24: tighten CORS. `allow_origins=[...]` with `allow_credentials=True`
     # and wildcard methods/headers is a "any origin we reflect can send
     # credentials" policy — CSRF-with-credentials hazard. Pin to the

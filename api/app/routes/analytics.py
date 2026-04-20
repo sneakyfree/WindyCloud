@@ -1,4 +1,13 @@
-"""Analytics endpoints — daily metrics for admin dashboard."""
+"""Analytics endpoints — daily metrics for admin dashboard.
+
+Wave 14 P1: gated on `require_admin`. The smoke report flagged that
+pre-Wave-14 these endpoints returned fleet-wide aggregate metrics
+(`total_files_uploaded`, `total_storage_bytes`, `compute_minutes`, …)
+to any authenticated user. Not PII per se, but business metrics a
+competitor or churned free user shouldn't trivially scrape, and the
+surface becomes a business-health leak at scale. See
+`docs/SMOKE_REPORT_2026-04-19.md §8`.
+"""
 
 from __future__ import annotations
 
@@ -6,7 +15,7 @@ from fastapi import APIRouter, Depends, Query
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from api.app.auth.dependencies import AuthenticatedUser, get_current_user
+from api.app.auth.dependencies import AuthenticatedUser, require_admin
 from api.app.db.engine import get_db
 from api.app.db.models import AnalyticsEvent
 
@@ -16,7 +25,7 @@ router = APIRouter()
 @router.get("/daily")
 async def daily_analytics(
     days: int = Query(30, ge=1, le=365),
-    user: AuthenticatedUser = Depends(get_current_user),
+    user: AuthenticatedUser = Depends(require_admin),
     db: AsyncSession = Depends(get_db),
 ):
     """Get daily analytics for the last N days."""
@@ -52,7 +61,7 @@ async def daily_analytics(
 
 @router.get("/summary")
 async def analytics_summary(
-    user: AuthenticatedUser = Depends(get_current_user),
+    user: AuthenticatedUser = Depends(require_admin),
     db: AsyncSession = Depends(get_db),
 ):
     """Overall analytics summary."""

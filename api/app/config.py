@@ -73,7 +73,23 @@ class Settings(BaseSettings):
     port: int = 8200
     log_level: str = "info"
     dev_mode: bool = False
-    cors_origins: str = "https://windyword.ai,https://windycloud.com"
+    # Wave 14 P1: defaults now include the apex `windyword.ai`, the
+    # current deploy target `cloud.windyword.ai`, and the legacy
+    # `windycloud.com` that was the Phase-2 alias. Host .env still
+    # overrides via the CORS_ORIGINS env var; the running 2026-04-19
+    # host had it pinned to `https://cloud.windyword.ai` only, which
+    # blocks a browser at `https://windyword.ai` from calling Cloud's
+    # API (hatch-path deeplinks would CORS-block). Grant to update
+    # /opt/windy-cloud/.env on next restart.
+    cors_origins: str = (
+        "https://cloud.windyword.ai,https://windyword.ai,https://windycloud.com"
+    )
+
+    # Wave 14 P1 admin gate: comma-separated list of identity IDs that
+    # unlock admin-only endpoints (fleet-wide analytics today; future
+    # audit surfaces). Bootstrap allowlist — Wave 15 lets Pro emit an
+    # `admin` scope and we drop the env var.
+    admin_identity_ids: str = ""
 
     # Quotas
     # Pre-Wave-7 this was 500 MB while `tier_quota_free` was 5 GB — two
@@ -129,6 +145,10 @@ class Settings(BaseSettings):
             origins.append("http://localhost:3000")
             origins.append("http://localhost:8200")
         return origins
+
+    @property
+    def admin_identity_ids_list(self) -> list[str]:
+        return [s.strip() for s in self.admin_identity_ids.split(",") if s.strip()]
 
     @property
     def r2_configured(self) -> bool:
