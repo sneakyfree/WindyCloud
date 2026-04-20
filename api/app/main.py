@@ -164,6 +164,7 @@ def create_app() -> FastAPI:
     from api.app.routes.billing import router as billing_router
     from api.app.routes.compute import router as compute_router
     from api.app.routes.deeplink import router as deeplink_router
+    from api.app.routes.eternitas_dispatcher import router as eternitas_dispatcher_router
     from api.app.routes.export import router as export_router
     from api.app.routes.health import router as health_router
     from api.app.routes.identity import router as identity_router
@@ -193,6 +194,13 @@ def create_app() -> FastAPI:
     # /plans, /health — none of which agents called but all of which
     # had to be remembered when adding gates. See routes/agent_compat.py.
     app.include_router(agent_compat_router, prefix="/api/v1", include_in_schema=False)
+
+    # Wave 14 P0: Eternitas's fanout posts every event type to a single
+    # per-subscriber URL (registered in Eternitas as
+    # `https://cloud.windyword.ai/webhooks/eternitas`). This dispatcher
+    # reads X-Eternitas-Event and re-dispatches to the canonical per-
+    # event handlers above. No prefix — the path is literal.
+    app.include_router(eternitas_dispatcher_router, include_in_schema=False)
 
     # Static files (PWA manifest, landing page, service worker)
     app.mount("/static", StaticFiles(directory=str(STATIC_DIR)), name="static")
