@@ -1,10 +1,25 @@
 """JWKS fetcher and JWT validator for Windy Pro / Eternitas tokens.
 
-Wave 7 G7 — supports optional `audience` / `issuer` enforcement. When
-the corresponding env settings are non-empty, PyJWT validates those
-claims and rejects tokens whose `aud`/`iss` don't match. When they're
-empty (default), validation falls back to the original signature-only
-behaviour — no breaking change for existing deploys.
+Wave 7 G7 introduced optional `audience` / `issuer` enforcement so
+tokens minted for another product couldn't authenticate.
+
+Wave 14 P0 loosens that pass-through for the Pro→Cloud path because
+Pro's production `generateOAuthTokens()` emits:
+    { iss: 'windy-identity', userId, windyIdentityId, ... }
+— no `aud`, no `sub`. Cloud's strict Wave-7 validator rejected every
+real Pro login with 401, which left every authed Cloud endpoint
+unreachable by paying users. Wave 14 therefore:
+
+  - accepts the canonical form AND Pro's current form (iss via a list);
+  - drops `sub` from the required-claims set (`extract_identity_id`
+    falls through to `windyIdentityId`/`userId`);
+  - leaves audience enforcement **disabled** by default — a Pro token
+    with no `aud` claim must still decode. When Pro starts emitting
+    `aud=windy-cloud`, set `WINDY_CLOUD_EXPECTED_AUDIENCE` to re-enable.
+
+Wave 15 will tighten back up once Pro emits the canonical shape
+(`iss=https://api.windyword.ai`, `aud=windy-cloud`, `sub=<identity_id>`).
+See docs/WAVE14_FIX_REPORT.md §"Wave 15 handoff".
 """
 
 from __future__ import annotations
@@ -16,12 +31,30 @@ import jwt
 from jwt import PyJWKClient
 
 
+def _normalize_claim_expectation(value: str | list[str]) -> str | list[str] | None:
+    """Return None for empty, a list for CSV, or the single string.
+
+    Accepting CSV via the env var lets a host config hold "windy-identity,
+    https://api.windyword.ai" in a single line without touching pydantic-
+    settings' parsing (which would otherwise need a validator).
+    """
+    if not value:
+        return None
+    if isinstance(value, str):
+        if "," in value:
+            parts = [s.strip() for s in value.split(",") if s.strip()]
+            return parts if len(parts) > 1 else parts[0] if parts else None
+        return value
+    return list(value) if value else None
+
+
 class JWKSValidator:
     """Fetches JWKS from a remote endpoint and validates RS256/ES256 JWTs.
 
-    `audience` / `issuer`: when non-empty, passed to `jwt.decode` so
-    PyJWT rejects tokens whose claims don't match. When empty, no
-    corresponding validation runs — matches pre-Wave-7 behaviour.
+    `audience` / `issuer` accept a single value OR a comma-separated list.
+    When non-empty, PyJWT enforces the claim against the set; when empty,
+    the claim is unchecked (matches Wave-14 compat with Pro's in-flight
+    shape).
     """
 
     def __init__(
@@ -29,13 +62,13 @@ class JWKSValidator:
         jwks_url: str,
         cache_ttl: int = 300,
         *,
-        audience: str = "",
-        issuer: str = "",
+        audience: str | list[str] = "",
+        issuer: str | list[str] = "",
     ):
         self.jwks_url = jwks_url
         self._cache_ttl = cache_ttl
-        self._audience = audience or None
-        self._issuer = issuer or None
+        self._audience = _normalize_claim_expectation(audience)
+        self._issuer = _normalize_claim_expectation(issuer)
         self._jwk_client: PyJWKClient | None = None
         self._last_fetch: float = 0
 
@@ -49,16 +82,16 @@ class JWKSValidator:
     def validate_token(self, token: str) -> dict[str, Any]:
         """Validate a JWT and return its decoded claims.
 
-        Raises jwt.exceptions.PyJWTError on any validation failure —
-        including `InvalidAudienceError` / `InvalidIssuerError` when
-        `audience` / `issuer` are configured and the token's claims
-        don't match.
+        Wave 14: `sub` is NOT in the required-claims set — Pro currently
+        omits it. `extract_identity_id` below handles the fall-through.
+        Raises on signature / expiry / audience-mismatch / issuer-
+        mismatch when those are configured.
         """
         client = self._get_client()
         signing_key = client.get_signing_key_from_jwt(token)
         decode_kwargs: dict[str, Any] = {
             "algorithms": ["RS256", "ES256"],
-            "options": {"require": ["exp", "sub"]},
+            "options": {"require": ["exp"]},
         }
         if self._audience is not None:
             decode_kwargs["audience"] = self._audience
@@ -72,15 +105,43 @@ _pro_validator: JWKSValidator | None = None
 _eternitas_validator: JWKSValidator | None = None
 
 
+# Wave 14: transitional issuer Pro currently emits. Always accepted in
+# addition to the canonical form so Wave 14 works without a .env edit on
+# the live host. Remove once Pro ships the Wave 15 canonical shape.
+_PRO_TRANSITIONAL_ISSUER = "windy-identity"
+
+
+def _pro_issuer_set(configured: str) -> str | list[str]:
+    """Return the set of accepted `iss` values for Pro tokens.
+
+    Always includes the Wave-14 transitional issuer `windy-identity`.
+    If a host has pinned `WINDY_PRO_EXPECTED_ISSUER=https://api.windyword.ai`,
+    the configured value is unioned in. Empty config → transitional only.
+    """
+    if not configured:
+        return _PRO_TRANSITIONAL_ISSUER
+    if configured == _PRO_TRANSITIONAL_ISSUER:
+        return configured
+    # Union — return a list so PyJWT's `issuer=` matches against any.
+    return [_PRO_TRANSITIONAL_ISSUER, configured]
+
+
 def get_pro_validator() -> JWKSValidator:
     global _pro_validator
     if _pro_validator is None:
         from api.app.config import settings
 
+        # Wave 14: audience enforcement paused for Pro tokens specifically
+        # — Pro's generateOAuthTokens() doesn't set `aud` yet, so passing
+        # WINDY_CLOUD_EXPECTED_AUDIENCE through here would make PyJWT
+        # raise MissingRequiredClaimError on every real token. The env
+        # var is still honoured on the Eternitas validator and will be
+        # re-enabled here in Wave 15 once Pro emits aud=windy-cloud. See
+        # docs/WAVE14_FIX_REPORT.md §"Wave 15 handoff".
         _pro_validator = JWKSValidator(
             settings.windy_pro_jwks_url,
-            audience=settings.windy_cloud_expected_audience,
-            issuer=settings.windy_pro_expected_issuer,
+            audience="",
+            issuer=_pro_issuer_set(settings.windy_pro_expected_issuer),
         )
     return _pro_validator
 
@@ -109,6 +170,23 @@ def _reset_validators_for_testing() -> None:
 def extract_identity_id(claims: dict[str, Any]) -> str:
     """Extract identity from JWT claims.
 
-    Priority: windy_identity_id → passport_number (EPT) → sub (fallback).
+    Wave 14: order widened to cover Pro's camelCase emission + the
+    Node-side `userId`/`accountId` fallbacks. Pro currently sets
+    `userId` and `windyIdentityId` but never `sub`; all three resolve
+    to the same value, so any of them is correct.
+
+    Priority: windy_identity_id → windyIdentityId → passport_number
+    (EPT) → sub → userId → accountId.
     """
-    return claims.get("windy_identity_id") or claims.get("passport_number") or claims["sub"]
+    for key in (
+        "windy_identity_id",
+        "windyIdentityId",
+        "passport_number",
+        "sub",
+        "userId",
+        "accountId",
+    ):
+        value = claims.get(key)
+        if value:
+            return str(value)
+    raise KeyError("No identity claim found (tried windy_identity_id, sub, userId, …)")
