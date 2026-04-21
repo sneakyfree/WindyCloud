@@ -66,9 +66,7 @@ class SecurityHeadersMiddleware(BaseHTTPMiddleware):
         response = await call_next(request)
         headers = response.headers
         # `setdefault` preserves any value a route has already set.
-        headers.setdefault(
-            "Strict-Transport-Security", "max-age=31536000; includeSubDomains"
-        )
+        headers.setdefault("Strict-Transport-Security", "max-age=31536000; includeSubDomains")
         headers.setdefault("X-Content-Type-Options", "nosniff")
         headers.setdefault("X-Frame-Options", "DENY")
         headers.setdefault("Referrer-Policy", "strict-origin-when-cross-origin")

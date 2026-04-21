@@ -81,9 +81,7 @@ class Settings(BaseSettings):
     # blocks a browser at `https://windyword.ai` from calling Cloud's
     # API (hatch-path deeplinks would CORS-block). Grant to update
     # /opt/windy-cloud/.env on next restart.
-    cors_origins: str = (
-        "https://cloud.windyword.ai,https://windyword.ai,https://windycloud.com"
-    )
+    cors_origins: str = "https://cloud.windyword.ai,https://windyword.ai,https://windycloud.com"
 
     # Wave 14 P1 admin gate: comma-separated list of identity IDs that
     # unlock admin-only endpoints (fleet-wide analytics today; future

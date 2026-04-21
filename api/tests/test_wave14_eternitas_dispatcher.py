@@ -66,9 +66,7 @@ async def test_dispatcher_routes_trust_changed_to_hmac_handler(client):
 
 @pytest.mark.asyncio
 async def test_dispatcher_rejects_trust_changed_with_bad_hmac(client):
-    body = json.dumps(
-        {"event": "trust.changed", "passport_number": "ET26-ABCD-1234"}
-    ).encode()
+    body = json.dumps({"event": "trust.changed", "passport_number": "ET26-ABCD-1234"}).encode()
     resp = await client.post(
         "/webhooks/eternitas",
         content=body,
@@ -84,9 +82,7 @@ async def test_dispatcher_rejects_trust_changed_with_bad_hmac(client):
 
 @pytest.mark.asyncio
 async def test_dispatcher_rejects_trust_changed_without_signature(client):
-    body = json.dumps(
-        {"event": "trust.changed", "passport_number": "ET26-ABCD-1234"}
-    ).encode()
+    body = json.dumps({"event": "trust.changed", "passport_number": "ET26-ABCD-1234"}).encode()
     resp = await client.post(
         "/webhooks/eternitas",
         content=body,
@@ -278,9 +274,7 @@ async def test_dispatcher_falls_back_to_body_event_when_header_missing(
 ):
     """Eternitas sometimes sets only the body.event field (older
     platform versions). The dispatcher must still route."""
-    body = json.dumps(
-        {"event": "trust.changed", "passport_number": "ET26-BODY-EVENT"}
-    ).encode()
+    body = json.dumps({"event": "trust.changed", "passport_number": "ET26-BODY-EVENT"}).encode()
     resp = await client.post(
         "/webhooks/eternitas",
         content=body,

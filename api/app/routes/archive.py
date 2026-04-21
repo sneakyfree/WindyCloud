@@ -109,9 +109,7 @@ async def _archive_upload(
 ) -> ArchiveResponse:
     """Shared logic for all archive endpoints."""
     async with _upload_semaphore:
-        return await _do_archive_upload(
-            archive_key, file, metadata, user, db, filename_override
-        )
+        return await _do_archive_upload(archive_key, file, metadata, user, db, filename_override)
 
 
 async def _do_archive_upload(

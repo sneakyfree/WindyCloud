@@ -156,9 +156,7 @@ async def test_identity_created_webhook_replay_rejected(client):
     if not settings.identity_webhook_secret:
         settings.identity_webhook_secret = "wave11-identity-hmac-secret-deterministic"
 
-    sig = hmac.new(
-        settings.identity_webhook_secret.encode(), body, hashlib.sha256
-    ).hexdigest()
+    sig = hmac.new(settings.identity_webhook_secret.encode(), body, hashlib.sha256).hexdigest()
 
     # Stale timestamp (1 hour ago)
     r = await client.post(

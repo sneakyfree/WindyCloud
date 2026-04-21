@@ -119,7 +119,8 @@ def test_sub_no_longer_required():
 
 
 def test_extract_prefers_snake_case_when_both_present():
-    assert extract_identity_id({"windy_identity_id": "snake", "windyIdentityId": "camel"}) == "snake"
+    payload = {"windy_identity_id": "snake", "windyIdentityId": "camel"}
+    assert extract_identity_id(payload) == "snake"
 
 
 def test_extract_falls_through_to_camel_case():

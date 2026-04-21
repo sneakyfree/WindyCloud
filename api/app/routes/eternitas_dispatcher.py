@@ -124,9 +124,7 @@ async def dispatch_eternitas(
                 detail="Body must be a JSON object",
             )
         if event_type == "passport.revoked":
-            return await handle_passport_revoked(
-                payload=PassportRevokedPayload(**body_json), db=db
-            )
+            return await handle_passport_revoked(payload=PassportRevokedPayload(**body_json), db=db)
         return await handle_passport_reinstated(
             payload=PassportReinstatedPayload(**body_json), db=db
         )

@@ -178,7 +178,6 @@ async def test_trust_changed_webhook_flushes_our_cache(monkeypatch):
 
     from api.app.db.engine import get_db
     from api.app.main import create_app
-    from api.app.services.trust_client import get_trust_client
 
     secret = "live-test-trust-webhook-secret"
     monkeypatch.setattr(settings, "eternitas_webhook_secret", secret)
@@ -187,7 +186,6 @@ async def test_trust_changed_webhook_flushes_our_cache(monkeypatch):
     from api.app.services.cache_backend import get_cache_backend
     from api.app.services.trust_client import _trust_cache_key
 
-    client = get_trust_client()
     backend = get_cache_backend()
     fake = TrustInfo(
         passport_number="ET-CACHE-ME",

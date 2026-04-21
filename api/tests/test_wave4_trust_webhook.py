@@ -22,7 +22,6 @@ from api.app.services.trust_client import (
     TrustInfo,
     _reset_trust_client_for_testing,
     _trust_cache_key,
-    get_trust_client,
 )
 
 WEBHOOK_SECRET = "wave4-trust-secret"
@@ -58,9 +57,7 @@ async def test_flushes_cache_on_valid_delivery(client, trust_secret):
     from api.app.services.cache_backend import get_cache_backend
 
     backend = get_cache_backend()
-    cached = TrustInfo(
-        passport_number="ET-FLUSH", status="active", tier_multiplier=1.0
-    )
+    cached = TrustInfo(passport_number="ET-FLUSH", status="active", tier_multiplier=1.0)
     await backend.set(_trust_cache_key("ET-FLUSH"), cached.to_bytes(), 300)
     assert await backend.get(_trust_cache_key("ET-FLUSH")) is not None
 

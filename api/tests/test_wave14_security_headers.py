@@ -11,7 +11,6 @@ from __future__ import annotations
 
 import pytest
 
-
 _EXPECTED_HEADERS = {
     "Strict-Transport-Security",
     "X-Content-Type-Options",
