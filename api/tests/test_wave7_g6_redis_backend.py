@@ -34,7 +34,6 @@ from api.app.services.trust_client import (
     _trust_cache_key,
 )
 
-
 # ---------------------------------------------------------------------------
 # InMemoryCacheBackend semantics
 # ---------------------------------------------------------------------------

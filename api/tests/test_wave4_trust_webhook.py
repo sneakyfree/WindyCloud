@@ -22,7 +22,6 @@ from api.app.services.trust_client import (
     TrustInfo,
     _reset_trust_client_for_testing,
     _trust_cache_key,
-    get_trust_client,
 )
 
 WEBHOOK_SECRET = "wave4-trust-secret"

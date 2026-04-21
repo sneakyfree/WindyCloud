@@ -10,7 +10,6 @@ import pytest
 
 from api.app.auth.dependencies import (
     AuthenticatedUser,
-    get_current_user,
     require_admin,
 )
 from api.app.config import settings
@@ -107,7 +106,6 @@ async def test_analytics_daily_rejects_non_admin(client):
     to return TEST_USER, but not `require_admin`, so require_admin's
     inner get_current_user lookup will use the override. Since TEST_USER
     is not in any admin set, require_admin raises."""
-    from api.app.main import create_app
 
     # Reuse the shared client fixture's app but clear admin allowlist so
     # TEST_USER can't slip through by env var.
