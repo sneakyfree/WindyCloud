@@ -2,10 +2,13 @@
 
 **Window:** 2026-04-19 overnight (after the white-glove smoke that
 landed `docs/SMOKE_REPORT_2026-04-19.md`).
-**Scope:** 2 P0 launch blockers + 3 P1 closable findings from the smoke.
-**Outcome:** 4 PRs opened against `main`. Zero redeploy — Grant to
+**Scope:** 2 P0 launch blockers + 3 P1 closable findings from the smoke
+— plus follow-on P3 polish + one xfailed-test restoration when the
+first round finished early.
+**Outcome:** 6 PRs opened against `main`. Zero redeploy — Grant to
 batch-merge and restart the Cloud container in the morning.
-**Tests:** full suite stays green end-to-end (see "Verification" below).
+**Tests:** full suite stays green end-to-end; 426 passing, 0 xfailed
+(up from 393 passing + 1 xfailed at the start of the overnight).
 
 ---
 
@@ -20,8 +23,11 @@ batch-merge and restart the Cloud container in the morning.
 | 3b | P1 | Zero security headers on any Cloud response (no HSTS/CSP/XFO/…). | #40 | same branch |
 | 3c | P1 | Host `CORS_ORIGINS` pinned to `https://cloud.windyword.ai` only — apex and sister subdomains blocked. | #40 | same branch |
 | 4 | P1 | Pro's own `/health` reports `windy_cloud: unreachable`. **Not fixed here** — filed as [windy-pro#50](https://github.com/sneakyfree/windy-pro/issues/50). | — | — |
+| 5 | P3 | `/archive/*` silently drops an explicit `filename` form field. | [#41](https://github.com/sneakyfree/WindyCloud/pull/41) | `wave14/pr4-archive-filename` |
+| 6 | Reliability | Pre-G6 stale-on-5xx trust fail-soft was lost when caching moved to Redis; xfail'd in #36. | [#42](https://github.com/sneakyfree/WindyCloud/pull/42) | `wave14/pr5-stale-cache-fail-soft` |
+| H-4 | Policy | Reads-while-frozen: currently blocked (both `require_not_frozen` and `require_not_blocked_for_write` raise 403 on `plan.frozen`). **Assessed, current behaviour defensible, no code change.** See below. | — | — |
 
-PRs stack in dependency order: precursor → PR1 → PR2 → PR3. Merge in that order for clean rebases, or admin-merge precursor first and let PR1/2/3 auto-rebase.
+PRs stack in dependency order: precursor → PR1 → PR2 → PR3 → PR4 → PR5. Merge in that order for clean rebases, or admin-merge precursor first and let the rest auto-rebase.
 
 > **Orthogonal parallel-session PR:** a parallel overnight session also opened PR [#39](https://github.com/sneakyfree/WindyCloud/pull/39) (`wave14/fix-pro-jwks-url-cloud-side`) flipping Cloud's default `WINDY_PRO_JWKS_URL` from the apex (which Cloudflare Access 401-gates) to `pro.windyword.ai`. Already merged to main as commit `f1a05fa`. It touches the same `Settings` class as this PR's 3c CORS change — they land on different fields, so the rebase is clean, but re-check on merge.
 
@@ -339,6 +345,85 @@ and is explicitly documented as a Wave-15 design decision.
 
 ---
 
-*End of report. Generated during the 2026-04-19 overnight session. No
-redeploy issued — Grant owns the merge + restart sequence in the
-morning.*
+## PR #41 — P3 archive filename honoured
+
+Smoke §5 flagged that `POST /api/v1/archive/chat` with an explicit
+`-F filename=chat-backup.txt` stored the upload under the multipart
+filename (`cc_a.txt`), then `GET /archive/retrieve/windy_chat/chat-backup.txt`
+404'd. The form field was silently dropped because the route didn't
+declare it.
+
+**Fix:** each of the 5 archive routes now takes
+`filename: str | None = Form(None)` and passes it through to
+`_do_archive_upload`, which prefers the override, falls back to
+`file.filename`, then to a uuid-stamped default. `_sanitize_filename`
+still runs — path-traversal via the override (`filename=../../etc/passwd`)
+is stripped the same way.
+
+Scope kept narrow: `/storage/upload` didn't surface the same gap in
+the smoke, so no corresponding change there.
+
+5 new tests cover the override path, the multipart-name fallback, a
+cross-route regression on `/archive/mail`, empty-string handling, and
+path-traversal sanitisation.
+
+## PR #42 — stale-on-5xx trust fail-soft (xfail → pass)
+
+The precursor PR #36 xfailed `test_5xx_returns_stale_cache_when_available`
+because PR #11 (G6 Redis refactor) lost the pre-G6 in-process
+"serve-stale-when-upstream-5xx" behaviour. Redis honours TTLs strictly;
+once the primary entry expires, a 5xx returns `None` and the caller
+gets no trust at all.
+
+**Fix:** dual-keyspace pattern.
+
+- `trust:{passport}` — primary, 5 min TTL (unchanged).
+- `trust:lkg:{passport}` — **new** last-known-good shadow, 12× longer
+  TTL (`_LKG_MULTIPLIER`). Written on every successful fetch.
+
+On 5xx / network error with an expired primary: `_serve_lkg` reads the
+LKG; if present, serve + INFO-log. 404 and 429 deliberately do not
+fail-soft — a 404 passport was explicitly removed, and 429 is a
+caller back-off signal that shouldn't be obscured.
+
+`invalidate()` (called from `trust.changed` webhooks) clears **both**
+keyspaces — a policy-level state change shouldn't be silently masked
+by LKG on the next upstream blip.
+
+Xfail on the original test flipped to pass. 9 new LKG-specific tests
+in `test_wave14_trust_lkg.py` lock the contract down.
+
+## H-4 (Wave 11 §5.2) — reads-while-frozen: assessed, no change
+
+Wave 11 flagged that `require_not_frozen` + `require_not_blocked_for_write`
+both call `_raise_if_blocked`, which 403s on `plan.frozen` for reads
+AND writes alike. The hardening report left this as a product decision
+("suspended-but-recoverable" → reads allowed; "digital death" → reads
+blocked).
+
+On reflection:
+
+- **Existing `/webhooks/passport/reinstated`** (Wave 12 H-3) proves the
+  "reinstate-able" mental model — reads will resume once a passport
+  is reinstated and the webhook flips `plan.frozen = false`.
+- **Security angle favours current behaviour:** revoked passports mean
+  integrity/compromise issues. Allowing the frozen identity to
+  download their already-archived data could let a compromised actor
+  exfiltrate before ops completes reinstate-or-terminate triage.
+- **Product angle:** the paying user experience here is "your account
+  is suspended pending a trust-team review, no reads or writes until
+  resolved" — clearer than a partial-access state.
+
+**Decision:** leave as-is. If Grant has product intent that differs
+(e.g. "reads should continue; only writes block"), the split is a
+two-line change — make `require_not_frozen` skip the `plan.frozen`
+check while keeping the Eternitas-status check. Pinning the current
+semantic as intentional in this report so future audits don't re-open
+the finding.
+
+---
+
+*End of report. Generated during the 2026-04-19 overnight session
+across two rounds (initial 2 P0 + 3 P1, then a follow-on round for
+P3 polish + xfail restoration). No redeploy issued — Grant owns the
+merge + restart sequence in the morning.*
