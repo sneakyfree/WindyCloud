@@ -25,9 +25,9 @@ import pytest
 
 from api.app.services.cache_backend import InMemoryCacheBackend
 from api.app.services.trust_client import (
+    _LKG_MULTIPLIER,
     TrustClient,
     TrustInfo,
-    _LKG_MULTIPLIER,
     _trust_cache_key,
     _trust_lkg_key,
 )
@@ -89,9 +89,7 @@ async def test_5xx_serves_lkg_after_prime(monkeypatch):
         ],
     )
     backend = InMemoryCacheBackend()
-    client = TrustClient(
-        base_url="http://x", use_mock=False, ttl_seconds=1, backend=backend
-    )
+    client = TrustClient(base_url="http://x", use_mock=False, ttl_seconds=1, backend=backend)
     first = await client.get_trust("ET-LKG-500")
     time.sleep(1.2)  # let primary expire; LKG TTL is 12x so still alive
     second = await client.get_trust("ET-LKG-500")
@@ -121,9 +119,7 @@ async def test_network_error_serves_lkg_after_prime(monkeypatch):
         ],
     )
     backend = InMemoryCacheBackend()
-    client = TrustClient(
-        base_url="http://x", use_mock=False, ttl_seconds=1, backend=backend
-    )
+    client = TrustClient(base_url="http://x", use_mock=False, ttl_seconds=1, backend=backend)
     await client.get_trust("ET-LKG-NET")
     time.sleep(1.2)
     second = await client.get_trust("ET-LKG-NET")
@@ -136,9 +132,7 @@ async def test_5xx_without_prime_returns_none(monkeypatch):
     """No prior successful fetch → no LKG → 5xx returns None (not stale)."""
     _stub_httpx(monkeypatch, [(500, None)])
     backend = InMemoryCacheBackend()
-    client = TrustClient(
-        base_url="http://x", use_mock=False, ttl_seconds=1, backend=backend
-    )
+    client = TrustClient(base_url="http://x", use_mock=False, ttl_seconds=1, backend=backend)
     assert await client.get_trust("ET-NEW-AND-BROKEN") is None
 
 
@@ -168,9 +162,7 @@ async def test_404_does_not_serve_lkg(monkeypatch):
         ],
     )
     backend = InMemoryCacheBackend()
-    client = TrustClient(
-        base_url="http://x", use_mock=False, ttl_seconds=1, backend=backend
-    )
+    client = TrustClient(base_url="http://x", use_mock=False, ttl_seconds=1, backend=backend)
     await client.get_trust("ET-DELETED")
     time.sleep(1.2)
     # Second fetch: 404. Must return None, NOT the stale LKG.
@@ -199,9 +191,7 @@ async def test_429_does_not_serve_lkg(monkeypatch):
         ],
     )
     backend = InMemoryCacheBackend()
-    client = TrustClient(
-        base_url="http://x", use_mock=False, ttl_seconds=1, backend=backend
-    )
+    client = TrustClient(base_url="http://x", use_mock=False, ttl_seconds=1, backend=backend)
     await client.get_trust("ET-HAMMERED")
     time.sleep(1.2)
     assert await client.get_trust("ET-HAMMERED") is None
@@ -230,9 +220,7 @@ async def test_invalidate_clears_both_primary_and_lkg(monkeypatch):
         ],
     )
     backend = InMemoryCacheBackend()
-    client = TrustClient(
-        base_url="http://x", use_mock=False, ttl_seconds=300, backend=backend
-    )
+    client = TrustClient(base_url="http://x", use_mock=False, ttl_seconds=300, backend=backend)
     await client.get_trust("ET-INV")
     # Both written.
     assert await backend.get(_trust_cache_key("ET-INV")) is not None
@@ -299,9 +287,7 @@ async def test_corrupt_lkg_blob_returns_none_and_deletes(monkeypatch):
     backend = InMemoryCacheBackend()
     # Inject garbage into LKG directly.
     await backend.set(_trust_lkg_key("ET-CORRUPT"), b"not-valid-json{}", 60)
-    client = TrustClient(
-        base_url="http://x", use_mock=False, ttl_seconds=1, backend=backend
-    )
+    client = TrustClient(base_url="http://x", use_mock=False, ttl_seconds=1, backend=backend)
     # Primary is empty, LKG is corrupt, HTTP returns 5xx → None.
     result = await client.get_trust("ET-CORRUPT")
     assert result is None
@@ -334,9 +320,7 @@ async def test_primary_hit_does_not_touch_http_or_lkg(monkeypatch):
     await backend.set(_trust_cache_key("ET-HOT"), info.to_bytes(), 300)
     monkeypatch.setattr(tc_mod.httpx, "AsyncClient", _ExplodeIfCalled)
 
-    client = TrustClient(
-        base_url="http://x", use_mock=False, ttl_seconds=300, backend=backend
-    )
+    client = TrustClient(base_url="http://x", use_mock=False, ttl_seconds=300, backend=backend)
     result = await client.get_trust("ET-HOT")
     assert result is not None
     assert result.band == "good"

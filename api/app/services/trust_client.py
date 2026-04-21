@@ -111,6 +111,7 @@ class TrustInfo:
 # Client
 # ---------------------------------------------------------------------------
 
+
 def _trust_cache_key(passport_number: str) -> str:
     return f"trust:{passport_number}"
 
@@ -152,9 +153,7 @@ class TrustClient:
         self._base_url = (base_url or settings.eternitas_url).rstrip("/")
         self._ttl = ttl_seconds if ttl_seconds is not None else settings.trust_cache_ttl_seconds
         self._timeout = timeout if timeout is not None else settings.trust_http_timeout_seconds
-        self._use_mock = bool(
-            use_mock if use_mock is not None else settings.eternitas_use_mock
-        )
+        self._use_mock = bool(use_mock if use_mock is not None else settings.eternitas_use_mock)
         self._backend = backend or get_cache_backend()
 
     async def get_trust(self, passport_number: str) -> TrustInfo | None:
@@ -198,7 +197,8 @@ class TrustClient:
         except (httpx.HTTPError, OSError) as exc:
             logger.warning(
                 "Trust lookup failed for %s: %s — falling back to LKG",
-                passport_number, exc,
+                passport_number,
+                exc,
             )
             return await self._serve_lkg(lkg_key, passport_number)
 
@@ -210,7 +210,8 @@ class TrustClient:
         if resp.status_code >= 500:
             logger.warning(
                 "Trust lookup for %s returned %s — falling back to LKG",
-                passport_number, resp.status_code,
+                passport_number,
+                resp.status_code,
             )
             return await self._serve_lkg(lkg_key, passport_number)
         if resp.status_code != 200:
@@ -235,9 +236,7 @@ class TrustClient:
             await self._backend.set(lkg_key, payload, effective_ttl * _LKG_MULTIPLIER)
         return info
 
-    async def _serve_lkg(
-        self, lkg_key: str, passport_number: str
-    ) -> TrustInfo | None:
+    async def _serve_lkg(self, lkg_key: str, passport_number: str) -> TrustInfo | None:
         """Return the last-known-good entry if present, else None."""
         raw = await self._backend.get(lkg_key)
         if raw is None:
@@ -250,7 +249,9 @@ class TrustClient:
             return None
         logger.info(
             "Trust fail-soft: serving stale LKG for %s (band=%s status=%s)",
-            passport_number, info.band, info.status,
+            passport_number,
+            info.band,
+            info.status,
         )
         return info
 
