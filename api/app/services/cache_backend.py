@@ -50,6 +50,7 @@ class CacheBackend(Protocol):
 # In-memory backend — the pre-G6 behaviour.
 # ---------------------------------------------------------------------------
 
+
 class InMemoryCacheBackend:
     """Process-local dict with per-key expiry. Safe single-threaded-asyncio."""
 
@@ -89,6 +90,7 @@ class InMemoryCacheBackend:
 # ---------------------------------------------------------------------------
 # Redis backend — used when REDIS_URL is set.
 # ---------------------------------------------------------------------------
+
 
 class RedisCacheBackend:
     """Redis-backed cache/dedup. All operations go through one async pool.
@@ -137,9 +139,7 @@ class RedisCacheBackend:
     async def add_if_new(self, key: str, ttl_seconds: int) -> bool:
         try:
             # SET NX + EX in one command — atomic add-if-absent with TTL.
-            result = await self._client.set(
-                self._k(key), b"1", nx=True, ex=ttl_seconds
-            )
+            result = await self._client.set(self._k(key), b"1", nx=True, ex=ttl_seconds)
             return bool(result)
         except Exception as exc:  # noqa: BLE001
             logger.warning("Redis SETNX %s failed: %s", key, exc)

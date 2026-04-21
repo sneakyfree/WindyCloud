@@ -176,13 +176,15 @@ async def test_passport_revoked_freezes_plan(client, db_session, hmac_secret, et
     )
 
     # Eternitas signs a revocation token
-    revoke_token = eternitas_es256({
-        "sub": "ET-42",
-        "passport_number": "ET-42",
-        "reason": "ban",
-        "exp": int(time.time()) + 60,
-        "jti": "wave2-rev-42",  # Wave 7 G14: required for replay dedup
-    })
+    revoke_token = eternitas_es256(
+        {
+            "sub": "ET-42",
+            "passport_number": "ET-42",
+            "reason": "ban",
+            "exp": int(time.time()) + 60,
+            "jti": "wave2-rev-42",  # Wave 7 G14: required for replay dedup
+        }
+    )
 
     resp = await client.post(
         "/api/v1/webhooks/passport/revoked",
@@ -208,12 +210,14 @@ async def test_passport_revoked_rejects_unsigned(client, eternitas_es256):
 
 @pytest.mark.asyncio
 async def test_passport_revoked_unknown_passport(client, eternitas_es256):
-    token = eternitas_es256({
-        "sub": "ET-NOPE",
-        "passport_number": "ET-NOPE",
-        "exp": int(time.time()) + 60,
-        "jti": "wave2-rev-nope",  # Wave 7 G14: required for replay dedup
-    })
+    token = eternitas_es256(
+        {
+            "sub": "ET-NOPE",
+            "passport_number": "ET-NOPE",
+            "exp": int(time.time()) + 60,
+            "jti": "wave2-rev-nope",  # Wave 7 G14: required for replay dedup
+        }
+    )
     resp = await client.post(
         "/api/v1/webhooks/passport/revoked",
         json={"token": token},

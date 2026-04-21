@@ -63,9 +63,7 @@ def eternitas_es256(monkeypatch):
 
 
 async def _seed_bridge_and_plan(db_session, identity: str, passport: str):
-    db_session.add(
-        IdentityBridge(windy_identity_id=identity, passport_number=passport)
-    )
+    db_session.add(IdentityBridge(windy_identity_id=identity, passport_number=passport))
     db_session.add(
         UserPlan(
             identity_id=identity,
@@ -117,12 +115,8 @@ async def test_replayed_revocation_is_a_no_op(client, db_session, eternitas_es25
         jti="rev-replay-me",
         passport_number="ET-G14-2",
     )
-    r1 = await client.post(
-        "/api/v1/webhooks/passport/revoked", json={"token": token}
-    )
-    r2 = await client.post(
-        "/api/v1/webhooks/passport/revoked", json={"token": token}
-    )
+    r1 = await client.post("/api/v1/webhooks/passport/revoked", json={"token": token})
+    r2 = await client.post("/api/v1/webhooks/passport/revoked", json={"token": token})
 
     assert r1.status_code == 200 and r1.json()["status"] == "frozen"
     assert r2.status_code == 200 and r2.json()["status"] == "duplicate"
@@ -130,9 +124,7 @@ async def test_replayed_revocation_is_a_no_op(client, db_session, eternitas_es25
 
 
 @pytest.mark.asyncio
-async def test_different_jti_for_same_passport_processed(
-    client, db_session, eternitas_es256
-):
+async def test_different_jti_for_same_passport_processed(client, db_session, eternitas_es256):
     """Two revocation events for the same passport (different jti) both
     process — e.g., revoke → reinstate → revoke again with new jti."""
     await _seed_bridge_and_plan(db_session, "g14-user-3", "ET-G14-3")
@@ -140,12 +132,8 @@ async def test_different_jti_for_same_passport_processed(
     t1 = eternitas_es256(jti="rev-a", passport_number="ET-G14-3")
     t2 = eternitas_es256(jti="rev-b", passport_number="ET-G14-3")
 
-    r1 = await client.post(
-        "/api/v1/webhooks/passport/revoked", json={"token": t1}
-    )
-    r2 = await client.post(
-        "/api/v1/webhooks/passport/revoked", json={"token": t2}
-    )
+    r1 = await client.post("/api/v1/webhooks/passport/revoked", json={"token": t1})
+    r2 = await client.post("/api/v1/webhooks/passport/revoked", json={"token": t2})
 
     # Both process — second one is still "frozen" (idempotent DB side effect)
     # because we don't know it's a double-revoke without business logic.

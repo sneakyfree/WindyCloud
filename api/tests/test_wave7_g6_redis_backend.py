@@ -38,6 +38,7 @@ from api.app.services.trust_client import (
 # InMemoryCacheBackend semantics
 # ---------------------------------------------------------------------------
 
+
 @pytest.mark.asyncio
 async def test_inmemory_get_set_delete():
     b = InMemoryCacheBackend()
@@ -73,15 +74,14 @@ async def test_inmemory_add_if_new_is_atomic_across_calls():
 async def test_inmemory_add_if_new_concurrent():
     """Fire 50 concurrent add_if_new for the same key — exactly one must win."""
     b = InMemoryCacheBackend()
-    results = await asyncio.gather(
-        *[b.add_if_new("shared", 60) for _ in range(50)]
-    )
+    results = await asyncio.gather(*[b.add_if_new("shared", 60) for _ in range(50)])
     assert sum(1 for r in results if r) == 1
 
 
 # ---------------------------------------------------------------------------
 # Factory selection
 # ---------------------------------------------------------------------------
+
 
 def test_factory_picks_inmemory_when_redis_url_empty(monkeypatch):
     from api.app.config import settings
@@ -108,6 +108,7 @@ def test_factory_picks_redis_when_redis_url_set(monkeypatch):
 # ---------------------------------------------------------------------------
 # TrustClient round-trip through the backend
 # ---------------------------------------------------------------------------
+
 
 @pytest.mark.asyncio
 async def test_trust_client_caches_through_backend():
@@ -173,6 +174,7 @@ async def test_corrupt_cache_entry_is_discarded():
 # ---------------------------------------------------------------------------
 # Dedupe across simulated workers
 # ---------------------------------------------------------------------------
+
 
 @pytest.mark.asyncio
 async def test_dedup_across_simulated_workers():
