@@ -27,14 +27,20 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
+      - name: Lowercase image repo name
+        # GHCR / Docker registry v2 rejects uppercase characters in image names.
+        # github.repository is literal case (sneakyfree/WindyCloud) — lowercase it
+        # into IMAGE_REPO for the tags below. Shell parameter-expansion ${V,,}.
+        run: echo "IMAGE_REPO=${GITHUB_REPOSITORY,,}" >> "$GITHUB_ENV"
+
       - name: Build and push
         uses: docker/build-push-action@v6
         with:
           context: .
           push: true
           tags: |
-            ghcr.io/${{ github.repository }}:latest
-            ghcr.io/${{ github.repository }}:${{ github.sha }}
+            ghcr.io/${{ env.IMAGE_REPO }}:latest
+            ghcr.io/${{ env.IMAGE_REPO }}:${{ github.sha }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
 
