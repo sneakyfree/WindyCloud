@@ -13,7 +13,7 @@ itself wants eyes, but the *decision* for Grant is separable:
 **What needs deciding (post-merge):**
 - `WINDY_CLOUD_EXPECTED_AUDIENCE` — the `aud` claim Pro should mint on
   Cloud-destined tokens. Candidates: `"windy-cloud"`, `"cloud"`,
-  `"https://cloud.windyfly.ai"`, `"windycloud.com"`. Pick one string;
+  `"https://cloud.windycloud.com"`, `"windycloud.com"`. Pick one string;
   any choice works as long as it matches what Pro emits.
 - `WINDY_PRO_EXPECTED_ISSUER` — Pro's canonical issuer URL. Likely
   `"https://windyword.ai"` but confirm with Pro's current JWT
