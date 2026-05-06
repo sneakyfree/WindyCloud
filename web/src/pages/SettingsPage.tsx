@@ -38,7 +38,7 @@ export default function SettingsPage() {
                 type="password"
                 value={jwt}
                 onChange={(e) => setJwt(e.target.value)}
-                placeholder="Paste your Windy Pro JWT..."
+                placeholder="Paste your Windy Word JWT..."
                 className="flex-1 px-3 py-2 rounded-lg bg-[var(--bg)] border border-[var(--border)] text-sm text-[var(--text)] placeholder:text-[var(--text-muted)] outline-none focus:border-[var(--accent)]"
               />
               <button
