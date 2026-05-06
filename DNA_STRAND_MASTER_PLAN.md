@@ -465,8 +465,8 @@ windy-cloud/
 ```bash
 # === Required ===
 # Auth
-WINDY_PRO_JWKS_URL=https://windypro.thewindstorm.uk/.well-known/jwks.json
-ETERNITAS_JWKS_URL=https://eternitas.thewindstorm.uk/.well-known/eternitas-keys
+WINDY_PRO_JWKS_URL=https://account.windyword.ai/.well-known/jwks.json
+ETERNITAS_JWKS_URL=https://api.eternitas.ai/.well-known/eternitas-keys
 
 # R2 Storage
 R2_ACCOUNT_ID=your-cloudflare-account-id
@@ -501,7 +501,7 @@ VPS_DEFAULT_AMI=ami-ubuntu-24-04
 HOST=0.0.0.0
 PORT=8200
 LOG_LEVEL=info
-CORS_ORIGINS=https://windypro.thewindstorm.uk,https://cloud.windyfly.ai
+CORS_ORIGINS=https://account.windyword.ai,https://cloud.windycloud.com
 
 # Quotas
 DEFAULT_STORAGE_QUOTA=524288000  # 500MB in bytes
@@ -516,7 +516,7 @@ MAX_UPLOAD_SIZE=1073741824       # 1GB max per file
 
 - **VPS:** Hostinger at `72.60.118.54` (Ubuntu 24.04, Docker ready)
 - **Port:** 8200 (fits the Windy port allocation scheme)
-- **Domain:** `cloud.windyfly.ai` or `cloud.thewindstorm.uk`
+- **Domain:** `cloud.windycloud.com` (canonical per kit-army-config/canonical-domains.json)
 - **Reverse proxy:** Nginx (same as other services)
 - **SSL:** Let's Encrypt via certbot
 
