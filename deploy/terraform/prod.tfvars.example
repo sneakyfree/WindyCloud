@@ -23,7 +23,7 @@ environment = "prod"
 # Compute
 instance_type  = "t3.small"   # Playbook §Phase 3 sizing
 ami_id         = "ami-0c101f26f147fa7fd" # Ubuntu 24.04 LTS, us-east-1 (verify before apply)
-domain         = "api.windycloud.com"
+domain         = "cloud.windycloud.com"
 
 # TheWindstorm VPC + subnets (Phase 3 playbook)
 # vpc_id            = "vpc-011cc35a43403f9ef"

@@ -12,7 +12,7 @@ reach nginx) gets a conservative default set.
 Headers chosen:
 
   - Strict-Transport-Security — 1-year HSTS with subdomains. Browsers
-    that have visited cloud.windyword.ai once will refuse http:// on
+    that have visited cloud.windycloud.com once will refuse http:// on
     every Windy subdomain thereafter, closing a downgrade-attack
     window. No `preload` — we don't want to commit the apex to HSTS
     preload without a Grant-owned rollout plan.

@@ -1,7 +1,7 @@
 """Wave 14 P0 — /webhooks/eternitas dispatcher.
 
 Eternitas fans every event type to a single per-subscriber URL
-(`https://cloud.windyword.ai/webhooks/eternitas`). This suite verifies
+(`https://cloud.windycloud.com/webhooks/eternitas`). This suite verifies
 the new no-prefix dispatcher routes correctly and that all existing
 handler semantics (HMAC verification, JWT verification, replay
 rejection, signature failure, unknown-event-ignore) remain intact when

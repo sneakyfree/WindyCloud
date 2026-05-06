@@ -208,7 +208,7 @@ def create_app() -> FastAPI:
 
     # Wave 14 P0: Eternitas's fanout posts every event type to a single
     # per-subscriber URL (registered in Eternitas as
-    # `https://cloud.windyword.ai/webhooks/eternitas`). This dispatcher
+    # `https://cloud.windycloud.com/webhooks/eternitas`). This dispatcher
     # reads X-Eternitas-Event and re-dispatches to the canonical per-
     # event handlers above. No prefix — the path is literal.
     app.include_router(eternitas_dispatcher_router, include_in_schema=False)

@@ -3,7 +3,7 @@
 # Usage: sudo ./deploy/setup.sh
 set -euo pipefail
 
-DOMAIN="${1:-cloud.windyfly.ai}"
+DOMAIN="${1:-cloud.windycloud.com}"
 PROJECT_DIR="${2:-/opt/windy-cloud}"
 
 echo "╔══════════════════════════════════════╗"

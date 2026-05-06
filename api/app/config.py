@@ -12,10 +12,9 @@ class Settings(BaseSettings):
     # realm (HTTP 401 with `WWW-Authenticate: Basic realm="WindyWord
     # Pre-Launch"`). Every Cloud-side JWT verify against a Pro-issued
     # token failed because Cloud couldn't fetch the JWKS at all. The
-    # Wave 14 decision is to move Pro's public JWKS to a dedicated
-    # subdomain (`pro.windyword.ai`); override via WINDY_PRO_JWKS_URL
-    # env var while DNS is still being rolled out.
-    windy_pro_jwks_url: str = "https://pro.windyword.ai/.well-known/jwks.json"
+    # canonical default now points at the unified account host
+    # (`account.windyword.ai`); override via WINDY_PRO_JWKS_URL.
+    windy_pro_jwks_url: str = "https://account.windyword.ai/.well-known/jwks.json"
     eternitas_jwks_url: str = "https://eternitas.ai/.well-known/eternitas-keys"
 
     # Optional audience / issuer validation (Wave 7 G7). Empty = accept
@@ -74,14 +73,14 @@ class Settings(BaseSettings):
     log_level: str = "info"
     dev_mode: bool = False
     # Wave 14 P1: defaults now include the apex `windyword.ai`, the
-    # current deploy target `cloud.windyword.ai`, and the legacy
+    # current deploy target `cloud.windycloud.com`, and the legacy
     # `windycloud.com` that was the Phase-2 alias. Host .env still
     # overrides via the CORS_ORIGINS env var; the running 2026-04-19
-    # host had it pinned to `https://cloud.windyword.ai` only, which
+    # host had it pinned to `https://cloud.windycloud.com` only, which
     # blocks a browser at `https://windyword.ai` from calling Cloud's
     # API (hatch-path deeplinks would CORS-block). Grant to update
     # /opt/windy-cloud/.env on next restart.
-    cors_origins: str = "https://cloud.windyword.ai,https://windyword.ai,https://windycloud.com"
+    cors_origins: str = "https://cloud.windycloud.com,https://windyword.ai,https://windycloud.com"
 
     # Wave 14 P1 admin gate: comma-separated list of identity IDs that
     # unlock admin-only endpoints (fleet-wide analytics today; future

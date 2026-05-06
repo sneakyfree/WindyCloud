@@ -109,5 +109,5 @@ def test_cors_default_includes_apex_and_cloud_subdomain():
 
     s = Settings(_env_file=None)  # ignore .env — exercise the default
     origins = s.cors_origins_list
-    assert "https://cloud.windyword.ai" in origins
+    assert "https://cloud.windycloud.com" in origins
     assert "https://windyword.ai" in origins

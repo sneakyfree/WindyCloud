@@ -13,7 +13,7 @@
 
 set -euo pipefail
 
-DOMAIN="${WINDY_CLOUD_DOMAIN:-cloud.windyfly.ai}"
+DOMAIN="${WINDY_CLOUD_DOMAIN:-cloud.windycloud.com}"
 PROJECT_DIR="/opt/windy-cloud"
 
 echo "╔══════════════════════════════════════════╗"

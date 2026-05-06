@@ -66,7 +66,7 @@ Why R2 instead of S3 for storage:
 You need:
 - AWS account with permissions for: ECS, ECR, RDS, ALB, Route53, IAM, CloudWatch, Secrets Manager.
 - A Cloudflare account with R2 enabled.
-- The domain `cloud.windyfly.ai` (or your environment's equivalent) delegated to Route53 or routed through a CNAME.
+- The domain `cloud.windycloud.com` (or your environment's equivalent) delegated to Route53 or routed through a CNAME.
 - `aws` CLI ≥ 2.15, `terraform` ≥ 1.6 (existing module lives at `deploy/aws-terraform/`).
 - `docker` + buildx for multi-arch image builds (Fargate is `linux/amd64`).
 
@@ -310,7 +310,7 @@ aws application-autoscaling put-scaling-policy \
 
 - Target group health check: `GET /health`, 200, interval 30s, threshold 2.
 - Listener rules:
-  - `Host: cloud.windyfly.ai` → forward to `windy-cloud-tg`.
+  - `Host: cloud.windycloud.com` → forward to `windy-cloud-tg`.
   - Default `/*` → return fixed 404 to discourage direct ALB lookups.
 - ACM cert in `us-east-1` (ALB requires in-region certs).
 - WAF: attach `AWSManagedRulesCommonRuleSet` + a rate-limit rule at
@@ -441,7 +441,7 @@ Per-product gotchas:
 Every product's CI should include a push against the staging Cloud:
 
 ```bash
-curl -fsS -X POST https://staging-cloud.windyfly.ai/api/v1/archive/chat \
+curl -fsS -X POST https://staging-cloud.windycloud.com/api/v1/archive/chat \
   -H "X-Service-Token: $STAGING_SERVICE_TOKEN" \
   -F "file=@./fixture.enc" \
   -F "windy_identity_id=test-product-$PRODUCT_CI_ID" \
@@ -555,7 +555,7 @@ Cut this and work through it on launch day:
 - [ ] Fargate cluster `windy-cloud-prod` + task role + execution role created
 - [ ] Run the migration task (`alembic upgrade head`) — confirms DB connectivity before the API task rolls
 - [ ] ECS service `windy-cloud-api` running `desired_count=2` with healthy targets on the ALB
-- [ ] ALB hostname `cloud.windyfly.ai` returns 200 on `GET /health`
+- [ ] ALB hostname `cloud.windycloud.com` returns 200 on `GET /health`
 - [ ] `GET /api/v1/storage/health` reports `provider=R2StorageProvider`
 - [ ] `curl -H "X-Service-Token: $TOKEN" $URL/api/v1/identity/by-passport/ET26-TEST-FAIR` returns 404 (not 401) — proves token is wired
 - [ ] Windy Pro registered as a platform on Eternitas so `passport.*` webhooks dispatch

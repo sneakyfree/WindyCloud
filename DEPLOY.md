@@ -159,7 +159,7 @@ rotation; the business logic ships in Wave 10.
 Configuration steps:
 
 1. In the Stripe dashboard, create a webhook endpoint targeting
-   `https://cloud.windyfly.ai/api/v1/webhooks/stripe`.
+   `https://cloud.windycloud.com/api/v1/webhooks/stripe`.
 2. Subscribe to: `customer.subscription.created`,
    `customer.subscription.updated`, `customer.subscription.deleted`,
    `invoice.paid`, `invoice.payment_failed`.
@@ -211,7 +211,7 @@ The first time you apply this:
 3. Run `deploy/scripts/migrate.sh` against the fresh RDS instance.
 4. Push a release tag; CI builds the image and pushes to GHCR.
 5. SSH into the EC2 host, run `systemctl start windycloud`.
-6. `scripts/smoke-test.sh https://cloud.windyfly.ai` — exit 0 required.
+6. `scripts/smoke-test.sh https://cloud.windycloud.com` — exit 0 required.
 7. Flip DNS from the staging EIP to the prod EIP.
 8. Tail `/var/log/windycloud.log` for the first hour.
 
