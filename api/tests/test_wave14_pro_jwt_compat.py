@@ -70,7 +70,7 @@ def test_pro_shape_no_aud_no_sub_decodes_when_aud_not_configured():
     """The Wave-14 Pro validator runs with audience='' — Pro tokens pass."""
     priv, pub = _rsa_keypair()
     token = _mint_pro_shape(priv)
-    v = _make_validator(pub, audience="", issuer=["windy-identity", "https://api.windyword.ai"])
+    v = _make_validator(pub, audience="", issuer=["windy-identity", "https://account.windyword.ai"])
     claims = v.validate_token(token)
     assert claims["iss"] == "windy-identity"
     assert "aud" not in claims
@@ -81,17 +81,17 @@ def test_pro_shape_canonical_iss_also_decodes():
     """Once Pro starts emitting the canonical iss, the same validator
     accepts it without re-config."""
     priv, pub = _rsa_keypair()
-    token = _mint_pro_shape(priv, iss="https://api.windyword.ai")
-    v = _make_validator(pub, audience="", issuer=["windy-identity", "https://api.windyword.ai"])
+    token = _mint_pro_shape(priv, iss="https://account.windyword.ai")
+    v = _make_validator(pub, audience="", issuer=["windy-identity", "https://account.windyword.ai"])
     claims = v.validate_token(token)
-    assert claims["iss"] == "https://api.windyword.ai"
+    assert claims["iss"] == "https://account.windyword.ai"
 
 
 def test_wrong_issuer_still_rejected():
     """An attacker-minted token claiming iss='attacker' is still rejected."""
     priv, pub = _rsa_keypair()
     token = _mint_pro_shape(priv, iss="https://attacker.example")
-    v = _make_validator(pub, audience="", issuer=["windy-identity", "https://api.windyword.ai"])
+    v = _make_validator(pub, audience="", issuer=["windy-identity", "https://account.windyword.ai"])
     with pytest.raises(pyjwt.InvalidIssuerError):
         v.validate_token(token)
 
@@ -155,9 +155,9 @@ def test_pro_issuer_set_configured_transitional_only_returns_string():
 
 
 def test_pro_issuer_set_canonical_unions_with_transitional():
-    assert _pro_issuer_set("https://api.windyword.ai") == [
+    assert _pro_issuer_set("https://account.windyword.ai") == [
         "windy-identity",
-        "https://api.windyword.ai",
+        "https://account.windyword.ai",
     ]
 
 
@@ -169,13 +169,13 @@ def test_pro_issuer_set_canonical_unions_with_transitional():
 def test_csv_issuer_parses_to_list():
     """A CSV env value like "a,b,c" decomposes into a list so PyJWT
     matches against any. Single value stays a string."""
-    v = JWKSValidator("http://stub", issuer="windy-identity,https://api.windyword.ai")
-    assert v._issuer == ["windy-identity", "https://api.windyword.ai"]
+    v = JWKSValidator("http://stub", issuer="windy-identity,https://account.windyword.ai")
+    assert v._issuer == ["windy-identity", "https://account.windyword.ai"]
 
 
 def test_single_value_issuer_stays_string():
-    v = JWKSValidator("http://stub", issuer="https://api.windyword.ai")
-    assert v._issuer == "https://api.windyword.ai"
+    v = JWKSValidator("http://stub", issuer="https://account.windyword.ai")
+    assert v._issuer == "https://account.windyword.ai"
 
 
 def test_empty_issuer_is_none():

@@ -12,7 +12,7 @@ endpoints under `/api/v1/webhooks/`:
   - POST /api/v1/webhooks/passport/reinstated
 
 Eternitas's `platforms.windycloud.webhook_url` in the registry is
-`https://cloud.windyword.ai/webhooks/eternitas` (no `/api/v1` prefix,
+`https://cloud.windycloud.com/webhooks/eternitas` (no `/api/v1` prefix,
 unified path). Every event posted there 404-ed — the 2026-04-20 00:09 UTC
 fanout logged `HTTP 404` / `dead_letter` against `plt_f01…` in
 Eternitas's `webhook_deliveries` table. Passport revocations + trust-

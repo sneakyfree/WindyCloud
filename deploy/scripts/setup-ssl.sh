@@ -4,7 +4,7 @@
 
 set -euo pipefail
 
-DOMAIN="${1:-cloud.windyfly.ai}"
+DOMAIN="${1:-cloud.windycloud.com}"
 EMAIL="${2:-admin@windycloud.com}"
 
 echo "=== Windy Cloud SSL Setup ==="

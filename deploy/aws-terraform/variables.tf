@@ -19,7 +19,7 @@ variable "ami_id" {
 variable "domain" {
   description = "Domain for Windy Cloud"
   type        = string
-  default     = "cloud.windyfly.ai"
+  default     = "cloud.windycloud.com"
 }
 
 variable "ssh_public_key" {

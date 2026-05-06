@@ -61,7 +61,7 @@ docker compose up -d
 
 ```bash
 # On the VPS (as root)
-sudo ./deploy/scripts/setup-ssl.sh cloud.windyfly.ai
+sudo ./deploy/scripts/setup-ssl.sh cloud.windycloud.com
 ```
 
 ## API
@@ -287,4 +287,4 @@ Nginx config in `deploy/nginx.conf`. SSL via Let's Encrypt — run `deploy/scrip
 
 **Phase:** 3 — All three pillars implemented
 **Port:** 8200
-**Domain:** cloud.windyfly.ai
+**Domain:** cloud.windycloud.com

@@ -25,7 +25,7 @@ variable "ami_id" {
 variable "domain" {
   description = "Public hostname for the API. Used for Route53 record and TLS."
   type        = string
-  default     = "cloud.windyfly.ai"
+  default     = "cloud.windycloud.com"
 }
 
 variable "ssh_public_key" {

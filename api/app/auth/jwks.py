@@ -18,7 +18,7 @@ unreachable by paying users. Wave 14 therefore:
     `aud=windy-cloud`, set `WINDY_CLOUD_EXPECTED_AUDIENCE` to re-enable.
 
 Wave 15 will tighten back up once Pro emits the canonical shape
-(`iss=https://api.windyword.ai`, `aud=windy-cloud`, `sub=<identity_id>`).
+(`iss=https://account.windyword.ai`, `aud=windy-cloud`, `sub=<identity_id>`).
 See docs/WAVE14_FIX_REPORT.md §"Wave 15 handoff".
 """
 
@@ -35,7 +35,7 @@ def _normalize_claim_expectation(value: str | list[str]) -> str | list[str] | No
     """Return None for empty, a list for CSV, or the single string.
 
     Accepting CSV via the env var lets a host config hold "windy-identity,
-    https://api.windyword.ai" in a single line without touching pydantic-
+    https://account.windyword.ai" in a single line without touching pydantic-
     settings' parsing (which would otherwise need a validator).
     """
     if not value:
@@ -115,7 +115,7 @@ def _pro_issuer_set(configured: str) -> str | list[str]:
     """Return the set of accepted `iss` values for Pro tokens.
 
     Always includes the Wave-14 transitional issuer `windy-identity`.
-    If a host has pinned `WINDY_PRO_EXPECTED_ISSUER=https://api.windyword.ai`,
+    If a host has pinned `WINDY_PRO_EXPECTED_ISSUER=https://account.windyword.ai`,
     the configured value is unioned in. Empty config → transitional only.
     """
     if not configured:
