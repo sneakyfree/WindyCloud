@@ -107,7 +107,7 @@ to look up per-passport trust tier + status, cached for 5 minutes.
 
 **Example:**
 ```bash
-ETERNITAS_URL=https://eternitas.ai
+ETERNITAS_URL=https://api.eternitas.ai
 ```
 
 Separate from `ETERNITAS_JWKS_URL` (which is `{ETERNITAS_URL}/.well-known/eternitas-keys`).
@@ -119,8 +119,8 @@ Separate from `ETERNITAS_JWKS_URL` (which is `{ETERNITAS_URL}/.well-known/eterni
 ```bash
 # Auth / JWKS
 WINDY_PRO_JWKS_URL=https://windyword.ai/.well-known/jwks.json
-ETERNITAS_JWKS_URL=https://eternitas.ai/.well-known/eternitas-keys
-ETERNITAS_URL=https://eternitas.ai
+ETERNITAS_JWKS_URL=https://api.eternitas.ai/.well-known/eternitas-keys
+ETERNITAS_URL=https://api.eternitas.ai
 
 # Shared secrets — mint per the instructions above
 IDENTITY_WEBHOOK_SECRET=<openssl rand -hex 32>

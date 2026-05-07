@@ -19,7 +19,7 @@ itself wants eyes, but the *decision* for Grant is separable:
   `"https://windyword.ai"` but confirm with Pro's current JWT
   template.
 - `ETERNITAS_EXPECTED_ISSUER` — Eternitas' canonical issuer URL.
-  Likely `"https://eternitas.ai"` but confirm against
+  Likely `"https://api.eternitas.ai"` but confirm against
   `/Users/thewindstorm/eternitas/docs/trust-api.md`.
 
 **Implications of deferring:** zero. The merge ships with all three

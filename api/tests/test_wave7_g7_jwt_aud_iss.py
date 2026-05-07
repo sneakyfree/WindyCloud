@@ -130,7 +130,7 @@ def test_settings_plumbing_passes_values_to_validators(monkeypatch):
 
     monkeypatch.setattr(settings, "windy_cloud_expected_audience", "windy-cloud")
     monkeypatch.setattr(settings, "windy_pro_expected_issuer", "https://account.windyword.ai")
-    monkeypatch.setattr(settings, "eternitas_expected_issuer", "https://eternitas.ai")
+    monkeypatch.setattr(settings, "eternitas_expected_issuer", "https://api.eternitas.ai")
     jwks_mod._reset_validators_for_testing()
 
     pro = jwks_mod.get_pro_validator()
@@ -141,6 +141,6 @@ def test_settings_plumbing_passes_values_to_validators(monkeypatch):
 
     et = jwks_mod.get_eternitas_validator()
     assert et._audience == "windy-cloud"
-    assert et._issuer == "https://eternitas.ai"
+    assert et._issuer == "https://api.eternitas.ai"
 
     jwks_mod._reset_validators_for_testing()
