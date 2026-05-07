@@ -248,7 +248,7 @@ Minimal, intentional, working. The source doc comment says windy-agent's ecosyst
 
 ### JWKS fetch: confirmed
 - Cloud reached Pro's JWKS in-flight (every one of my 40+ successful token validations did a `PyJWKClient.get_signing_key_from_jwt()` which hits `https://api.windyword.ai/.well-known/jwks.json` — cache TTL 300 s). No JWKS fetch errors in Cloud's logs.
-- Eternitas JWKS (`https://eternitas.windyword.ai/.well-known/eternitas-keys`) responded 429 "Rate limit exceeded" from my workstation — aggressive per-IP rate limit, not a Cloud issue. Cloud's server-to-server call succeeds (no errors in logs).
+- Eternitas JWKS (`https://api.eternitas.ai/.well-known/eternitas-keys`) responded 429 "Rate limit exceeded" from my workstation — aggressive per-IP rate limit, not a Cloud issue. Cloud's server-to-server call succeeds (no errors in logs).
 
 ### Identity webhook: confirmed working
 - HMAC-signed `POST /api/v1/webhooks/identity/created` test in §7 returned 201 and created a real `UserPlan` row — the Pro→Cloud identity-bridge is wired and verified. The only remaining bridge bit is: does Pro actually sign outbound `identity.created` with `IDENTITY_WEBHOOK_SECRET`? I couldn't trigger a real signup path to observe; needs Grant to cut a test user via Pro's register flow and watch Cloud logs.

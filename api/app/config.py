@@ -15,7 +15,7 @@ class Settings(BaseSettings):
     # canonical default now points at the unified account host
     # (`account.windyword.ai`); override via WINDY_PRO_JWKS_URL.
     windy_pro_jwks_url: str = "https://account.windyword.ai/.well-known/jwks.json"
-    eternitas_jwks_url: str = "https://eternitas.ai/.well-known/eternitas-keys"
+    eternitas_jwks_url: str = "https://api.eternitas.ai/.well-known/eternitas-keys"
 
     # Optional audience / issuer validation (Wave 7 G7). Empty = accept
     # any signed token from the JWKS (pre-Wave-7 behaviour). Set these in

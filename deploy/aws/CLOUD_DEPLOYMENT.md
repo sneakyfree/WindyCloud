@@ -236,8 +236,8 @@ traffic never reaches the pod if it's going to be rejected anyway.
     "portMappings": [{"containerPort": 8200, "protocol": "tcp"}],
     "environment": [
       {"name": "WINDY_PRO_JWKS_URL",   "value": "https://windyword.ai/.well-known/jwks.json"},
-      {"name": "ETERNITAS_JWKS_URL",   "value": "https://eternitas.ai/.well-known/eternitas-keys"},
-      {"name": "ETERNITAS_URL",        "value": "https://eternitas.ai"},
+      {"name": "ETERNITAS_JWKS_URL",   "value": "https://api.eternitas.ai/.well-known/eternitas-keys"},
+      {"name": "ETERNITAS_URL",        "value": "https://api.eternitas.ai"},
       {"name": "ETERNITAS_USE_MOCK",   "value": "false"},
       {"name": "PRICING_URL",          "value": "https://windyword.ai/pricing"},
       {"name": "CORS_ORIGINS",         "value": "https://windyword.ai,https://windycloud.com"}
