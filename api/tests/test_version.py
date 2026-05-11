@@ -1,4 +1,5 @@
 """Tests for /version (MF1 contract)."""
+
 import pytest
 
 
