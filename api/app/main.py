@@ -179,11 +179,11 @@ def create_app() -> FastAPI:
     from api.app.routes.export import router as export_router
     from api.app.routes.health import router as health_router
     from api.app.routes.identity import router as identity_router
-    from api.app.routes.version import router as version_router
     from api.app.routes.servers import router as servers_router
     from api.app.routes.storage import router as storage_router
     from api.app.routes.stripe_webhook import router as stripe_webhook_router
     from api.app.routes.sync import router as sync_router
+    from api.app.routes.version import router as version_router
     from api.app.routes.webhooks import router as webhooks_router
 
     app.include_router(health_router)
