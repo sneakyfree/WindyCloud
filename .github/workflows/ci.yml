@@ -45,3 +45,40 @@ jobs:
           echo "Health status: $STATUS"
           [ "$STATUS" = "ok" ] || exit 1
           docker stop cloud-ci
+
+  migrations:
+    # Marathon Foundation #7 — alembic round-trip against real Postgres.
+    # Catches broken downgrade() implementations at PR time. See
+    # ~/kit-army-config/docs/marathon-foundations-program-2026-05-11.md §MF7.
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: cloud
+          POSTGRES_PASSWORD: cloud
+          POSTGRES_DB: cloud
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U cloud"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    env:
+      DATABASE_URL: "postgresql+asyncpg://cloud:cloud@localhost:5432/cloud"
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v4
+      - run: uv venv .venv
+      - run: uv pip install -e ".[dev]"
+      - name: Migration round-trip (upgrade head → downgrade -1 → upgrade head)
+        run: |
+          set -euo pipefail
+          echo "──── Step 1: upgrade head ────"
+          .venv/bin/alembic upgrade head
+          echo "──── Step 2: downgrade -1 ────"
+          .venv/bin/alembic downgrade -1
+          echo "──── Step 3: upgrade head again ────"
+          .venv/bin/alembic upgrade head
+          echo "✅ Migration reversibility verified"
