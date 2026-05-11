@@ -36,7 +36,7 @@ def upgrade() -> None:
             sa.Column("tier", sa.String(20), server_default="free", nullable=False),
             sa.Column("quota_bytes", sa.BigInteger, server_default=sa.text("5368709120")),
             sa.Column(
-                "frozen", sa.Boolean, server_default=sa.text("0"), nullable=False
+                "frozen", sa.Boolean, server_default=sa.text("false"), nullable=False
             ),
             sa.Column("updated_at", sa.DateTime(timezone=True), nullable=False),
         )
@@ -53,7 +53,7 @@ def upgrade() -> None:
             op.add_column(
                 "user_plans",
                 sa.Column(
-                    "frozen", sa.Boolean, server_default=sa.text("0"), nullable=False
+                    "frozen", sa.Boolean, server_default=sa.text("false"), nullable=False
                 ),
             )
 

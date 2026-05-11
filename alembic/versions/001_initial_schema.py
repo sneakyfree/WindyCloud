@@ -27,7 +27,7 @@ def upgrade() -> None:
         sa.Column("storage_key", sa.String(1000), nullable=False, unique=True),
         sa.Column("size_bytes", sa.BigInteger, nullable=False),
         sa.Column("content_type", sa.String(200), server_default="application/octet-stream"),
-        sa.Column("encrypted", sa.Boolean, server_default=sa.text("0")),
+        sa.Column("encrypted", sa.Boolean, server_default=sa.text("false")),
         sa.Column("metadata_json", sa.Text, nullable=True),
         sa.Column("retention_count", sa.Integer, nullable=True),
         sa.Column("retention_days", sa.Integer, nullable=True),
