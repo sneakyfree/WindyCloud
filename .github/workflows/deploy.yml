@@ -1,61 +1,139 @@
 name: Deploy
 
+# Marathon Foundation #13 — auto-deploy to the windy-cloud EC2 on every
+# push to main that touches code or config. Pattern: SSH to EC2, rsync
+# the latest repo, inject MF1 env vars, rebuild + force-recreate the
+# `cloud` container, verify /version returns the deployed commit_sha.
+#
+# Graceful degradation: if DEPLOY_HOST/DEPLOY_USER/DEPLOY_SSH_KEY
+# secrets aren't set, the workflow short-circuits with a warning
+# instead of failing every push (matches windy-search MF13 pattern).
+#
+# Required GitHub repo secrets:
+#   DEPLOY_HOST     — EC2 public IP / hostname (e.g. 32.193.70.195)
+#   DEPLOY_USER     — SSH user on EC2 (typically: ubuntu)
+#   DEPLOY_SSH_KEY  — private SSH key (matching the key uploaded to the EC2)
+
 on:
   push:
     branches: [main]
     paths:
       - 'api/**'
+      - 'alembic/**'
       - 'deploy/**'
       - 'Dockerfile'
       - 'pyproject.toml'
-      - 'docker-compose.yml'
+      - 'docker-compose.prod.yml'
       - '.github/workflows/deploy.yml'
 
+concurrency:
+  group: deploy-${{ github.ref }}
+  cancel-in-progress: false
+
 jobs:
-  build-and-deploy:
+  preflight:
     runs-on: ubuntu-latest
+    if: github.ref == 'refs/heads/main'
+    outputs:
+      configured: ${{ steps.check.outputs.configured }}
+    steps:
+      - name: Check auto-deploy is configured
+        id: check
+        env:
+          HAS_HOST: ${{ secrets.DEPLOY_HOST != '' }}
+          HAS_USER: ${{ secrets.DEPLOY_USER != '' }}
+          HAS_KEY:  ${{ secrets.DEPLOY_SSH_KEY != '' }}
+        run: |
+          if [[ "$HAS_HOST" == "true" && "$HAS_USER" == "true" && "$HAS_KEY" == "true" ]]; then
+            echo "configured=true" >> "$GITHUB_OUTPUT"
+            echo "✅ Auto-deploy secrets configured; will deploy this commit."
+          else
+            echo "configured=false" >> "$GITHUB_OUTPUT"
+            echo "::warning::DEPLOY_HOST/DEPLOY_USER/DEPLOY_SSH_KEY not all configured; auto-deploy skipped. Set the missing repo secrets to enable."
+          fi
+
+  deploy:
+    runs-on: ubuntu-latest
+    needs: preflight
+    if: needs.preflight.outputs.configured == 'true'
     steps:
       - uses: actions/checkout@v4
 
-      - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v3
-
-      - name: Login to GitHub Container Registry
-        uses: docker/login-action@v3
-        with:
-          registry: ghcr.io
-          username: ${{ github.actor }}
-          password: ${{ secrets.GITHUB_TOKEN }}
-
-      - name: Lowercase image repo name
-        # GHCR / Docker registry v2 rejects uppercase characters in image names.
-        # github.repository is literal case (sneakyfree/WindyCloud) — lowercase it
-        # into IMAGE_REPO for the tags below. Shell parameter-expansion ${V,,}.
-        run: echo "IMAGE_REPO=${GITHUB_REPOSITORY,,}" >> "$GITHUB_ENV"
-
-      - name: Build and push
-        uses: docker/build-push-action@v6
-        with:
-          context: .
-          push: true
-          tags: |
-            ghcr.io/${{ env.IMAGE_REPO }}:latest
-            ghcr.io/${{ env.IMAGE_REPO }}:${{ github.sha }}
-          cache-from: type=gha
-          cache-to: type=gha,mode=max
-
-      - name: Deploy to AWS
-        uses: appleboy/ssh-action@v1
+      - name: Stage repo on EC2
+        uses: appleboy/scp-action@v0.1.7
         with:
           host: ${{ secrets.DEPLOY_HOST }}
-          username: ubuntu
+          username: ${{ secrets.DEPLOY_USER }}
           key: ${{ secrets.DEPLOY_SSH_KEY }}
+          source: "api/,alembic/,Dockerfile,pyproject.toml,uv.lock,alembic.ini,docker-compose.prod.yml"
+          target: "/tmp/windy-cloud-staging/"
+          overwrite: true
+          rm: true
+
+      - name: Deploy on EC2 + verify /version
+        uses: appleboy/ssh-action@v1
+        env:
+          GITHUB_SHA: ${{ github.sha }}
+        with:
+          host: ${{ secrets.DEPLOY_HOST }}
+          username: ${{ secrets.DEPLOY_USER }}
+          key: ${{ secrets.DEPLOY_SSH_KEY }}
+          envs: GITHUB_SHA
           script: |
-            cd /opt/windy-cloud
-            docker compose pull
-            docker compose up -d
-            docker image prune -f
-            # Verify health
-            sleep 5
-            curl -sf http://localhost:8200/health || echo "WARNING: health check failed"
-            echo "Deployed $(docker inspect --format='{{.Image}}' windy-cloud-cloud-1 | cut -c8-19)"
+            set -euo pipefail
+
+            STAGING=/tmp/windy-cloud-staging
+            TARGET=/opt/windy-cloud
+            TS=$(date -u +%Y-%m-%dT%H:%M:%SZ)
+
+            # 1. Snapshot the running deploy tree (rolling 5-snapshot retention)
+            cd "$TARGET"
+            sudo cp -a api "api.snap.$TS" 2>/dev/null || true
+            # prune old snapshots beyond the 5 most recent
+            sudo ls -1dt "$TARGET"/api.snap.* 2>/dev/null | tail -n +6 | xargs -r sudo rm -rf
+
+            # 2. rsync staged code into TARGET, preserving .env + secrets + bak files
+            sudo rsync -a --delete \
+              --exclude=".env*" \
+              --exclude="secrets/" \
+              --exclude="*.snap.*" \
+              --exclude="*.pre-*" \
+              --exclude="*.old" \
+              --exclude=".git" \
+              "$STAGING/" "$TARGET/"
+
+            # 3. Update MF1 env vars in /opt/windy-cloud/.env (the env_file source)
+            cd "$TARGET"
+            sudo sed -i '/^COMMIT_SHA=/d; /^BUILD_TIMESTAMP=/d; /^ENVIRONMENT=/d' .env
+            {
+              echo "COMMIT_SHA=$GITHUB_SHA"
+              echo "BUILD_TIMESTAMP=$TS"
+              echo "ENVIRONMENT=production"
+            } | sudo tee -a .env > /dev/null
+
+            # 4. Rebuild + force-recreate the cloud container
+            sudo docker compose --env-file .env -f docker-compose.prod.yml build cloud
+            sudo docker compose --env-file .env -f docker-compose.prod.yml up -d --force-recreate cloud
+
+            # 5. Wait for healthy + verify /version returns expected commit_sha
+            for i in $(seq 1 30); do
+              if curl -sf -m 2 http://localhost:8200/health >/dev/null 2>&1; then
+                break
+              fi
+              sleep 2
+            done
+
+            DEPLOYED_SHA=$(curl -s http://localhost:8200/version | python3 -c "import sys,json; print(json.load(sys.stdin).get('commit_sha',''))" 2>/dev/null)
+            if [[ "$DEPLOYED_SHA" == "$GITHUB_SHA" ]]; then
+              echo "✅ Deploy verified: /version returns ${DEPLOYED_SHA:0:7}"
+            else
+              echo "❌ Deploy verification failed: /version returned '$DEPLOYED_SHA', expected '${GITHUB_SHA:0:7}'"
+              echo "Recent container logs:"
+              sudo docker logs --tail 50 windy-cloud-cloud-1 || true
+              exit 1
+            fi
+
+            # 6. Prune dangling images to keep disk lean
+            sudo docker image prune -f >/dev/null 2>&1 || true
+
+            echo "Deploy complete: commit=${GITHUB_SHA:0:7} ts=$TS"
