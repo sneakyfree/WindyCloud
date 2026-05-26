@@ -1,0 +1,26 @@
+# Wave 13 Phase 3 prod compose — RDS replaces local postgres; the
+# single `cloud` service binds to 0.0.0.0:8200 inside the container,
+# host nginx reverse-proxies from 443.
+#
+# Captured 2026-05-26 from /opt/windy-cloud/docker-compose.prod.yml on
+# EC2 i-070327df339182f68 (32.193.70.195) per ADR-048 substrate-as-code
+# campaign. All secrets live in /opt/windy-cloud/.env on the host
+# (NEVER committed); .env.production.example enumerates required keys.
+# Project name `windy-cloud` is directory-derived (matches `compose ls`).
+
+name: windy-cloud
+
+services:
+  cloud:
+    build: .
+    env_file:
+      - .env
+    ports:
+      - "127.0.0.1:8200:8200"
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8200/health"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 45s
