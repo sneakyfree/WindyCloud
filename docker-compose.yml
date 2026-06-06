@@ -1,3 +1,19 @@
+# Local DEV compose — INTENTIONALLY diverges from docker-compose.prod.yml.
+#
+# This dev stack is a self-contained 3-container shape (cloud + web +
+# postgres) so a developer can `docker compose up` with no external
+# dependencies. Prod (docker-compose.prod.yml) is a single `cloud`
+# service: Wave 13 Phase 3 moved durable state off the box —
+#   - postgres  → AWS RDS
+#   - redis     → AWS ElastiCache       (never a dev container; env-toggled)
+#   - web/TLS   → system nginx on the host (not in compose)
+#   - app-state → R2 / RDS
+# so the prod compose declares ZERO named volumes and no web/postgres
+# containers. This divergence is deliberate; do NOT "align" the two by
+# deleting the dev postgres/web services — that would break local dev.
+# See SUBSTRATE.md ("Compose project" + "Tolerated drift") for the
+# authoritative explanation.
+
 services:
   cloud:
     build: .
