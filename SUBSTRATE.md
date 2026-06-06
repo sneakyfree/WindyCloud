@@ -7,6 +7,41 @@
 
 ---
 
+## ⚠ Canonical domain status — `windycloud.com` cutover is an OPERATOR-ONLY blocker (NOT a code/deploy bug)
+
+The canonical apex `windycloud.com` (and `cloud.windycloud.com`) is **NOT
+yet serving** as of this writing. This is sometimes referred to in
+ecosystem status reports as the "windycloud cutover FAILED" item — that
+phrasing is misleading. **Nothing is broken in this repo, the container,
+or the deploy pipeline.** The substrate is healthy and serving in
+production; it is only reachable on the **legacy `cloud.` host on the
+old `windyword.ai` zone** (a canonical-banned target — referred to here
+descriptively, never written as a live URL).
+
+The actual blocker is purely a **registrar / DNS action that only the
+operator (Grant) can perform**:
+
+- `windycloud.com` is still registered at **GoDaddy** with
+  `clientTransferProhibited` set; nameservers point at Cloudflare but
+  the registrar transfer was never initiated.
+- An earlier assumption that a scheduled lock-expiry would "auto-flip"
+  GoDaddy → Cloudflare on 2026-05-21 was **wrong**: a lock *expiring*
+  only *permits* a transfer, it does not *initiate* one. Verified via
+  `whois` 2026-05-28 — `dig windycloud.com / cloud.windycloud.com`
+  returns no A record (NXDOMAIN).
+- Fix sequence (operator-only, ~5–7 day approval window): GoDaddy
+  unlock → obtain EPP/auth code → initiate Cloudflare registrar
+  transfer → wait for approval → run the pre-staged 4-step DNS / cert /
+  CORS sequence (`kit-army-config/docs/windycloud-cutover-prep-2026-05-20.md`).
+
+**Implication for everything below:** any recovery step that probes
+`cloud.windycloud.com` will fail with NXDOMAIN until the transfer above
+completes. Until then the live host is the legacy `cloud.` host on the
+old `windyword.ai` zone. Do **not** treat this as a Cloud engineering
+regression — there is no code change in this repo that can resolve it.
+
+---
+
 ## Host
 
 | Field | Value |
@@ -111,7 +146,7 @@ Per `[[feedback_pydantic_settings_list_env]]`: `CORS_ORIGINS` must be JSON-quote
 
 ✓ **Project name `name: windy-cloud`** verified in committed prod compose.
 
-⚠ **Wave 13 Phase 3 shape simplification surfaced via the capture**: the committed prod compose is a single-service stack (no postgres, no web, no redis) — RDS+ElastiCache replaced the local containers. The dev compose still has the older 3-container shape. This SUBSTRATE.md was updated to reflect the prod-true state; the dev/prod divergence is intentional but warrants a future doc reconciliation.
+✓ **Wave 13 Phase 3 dev/prod compose divergence is now self-documenting**: the committed prod compose is a single-service stack (no postgres, no web, no redis) — RDS+ElastiCache+system-nginx replaced the local containers. The dev compose keeps the 3-container shape so local dev is self-contained. As of 2026-06-06 `docker-compose.yml` carries a header comment explaining the divergence is intentional and pointing back to this SUBSTRATE.md; the earlier "warrants a future doc reconciliation" note is resolved.
 
 ## Tolerated drift (allowlist)
 
@@ -131,7 +166,11 @@ Reproducible from git-state alone (with lockbox-restored `.env` and valid RDS + 
 3. Verify RDS + R2 + RunPod credentials are still valid.
 4. `cd /opt/windy-cloud && sudo docker compose --env-file .env -f docker-compose.prod.yml up -d`
 5. Restore/configure host nginx for TLS termination (proxy 443 → 127.0.0.1:8200).
-6. Verify:
+6. Verify (see the **Canonical domain status** callout at the top — until the
+   GoDaddy→Cloudflare registrar transfer completes, `cloud.windycloud.com`
+   returns NXDOMAIN and you must probe the legacy `cloud.` host on the old
+   `windyword.ai` zone instead; a failing curl here is a DNS/registrar
+   state, NOT a deploy bug):
    - `curl https://cloud.windycloud.com/health` → `{"status":"healthy"}`
    - `curl https://cloud.windycloud.com/version` → MF1 metadata with deployed `commit_sha`
    - Identity webhook: simulate a `POST /api/v1/webhooks/identity/created` with valid HMAC; expect 200
@@ -142,6 +181,7 @@ Reproducible from git-state alone (with lockbox-restored `.env` and valid RDS + 
 |---|---|---|
 | 2026-05-22 | Autonomous CTO loop T2.2 backfill | First substrate manifest authored from repo state. Discovered missing `docker-compose.prod.yml` gap (likely the auto-deploy gap memory referenced). Live audit pending. |
 | 2026-05-26 | Prod-compose-capture campaign (5 parallel SSH-verified captures) | `docker-compose.prod.yml` committed to git. Promoted ⓘ→✓ on EC2 ID + IP (now in compose header), project name `windy-cloud`, container name `windy-cloud-cloud-1`, port binding `127.0.0.1:8200:8200`. **Surfaced Wave 13 Phase 3 simplification**: prod compose is single-service (no postgres/web/redis containers — RDS+ElastiCache+system-nginx replaced them). SUBSTRATE.md updated to reflect prod-true shape; dev compose still has 3-container shape (intentional divergence). |
+| 2026-06-06 | Doc-reconciliation maintenance pass | Added the **Canonical domain status** callout making it unambiguous that the "windycloud cutover FAILED" item is an operator-only GoDaddy→Cloudflare registrar transfer (Grant-only), NOT a code/deploy bug, and annotated the recovery curl steps accordingly (NXDOMAIN on `cloud.windycloud.com` is expected pre-transfer). Documented the intentional dev/prod compose divergence with a header comment in `docker-compose.yml`; resolved the prior "warrants a future doc reconciliation" note. |
 
 ## Cross-references
 
