@@ -77,7 +77,14 @@ async def _resolve_event_type(
     return event_type, body_json
 
 
+# Tolerate BOTH the canonical no-prefix path and the /api/v1 path. The
+# Eternitas platform registry has historically been seeded with the
+# `/api/v1/webhooks/eternitas` variant (eternitas seed-windy-platforms.py),
+# which 404s against a no-prefix-only mount and would silently dead-letter
+# passport revocations — the exact Wave-14 incident this dispatcher exists to
+# prevent. Mounting both paths makes us immune to which side the registry uses.
 @router.post("/webhooks/eternitas")
+@router.post("/api/v1/webhooks/eternitas")
 async def dispatch_eternitas(
     request: Request,
     x_eternitas_event: str | None = Header(None, alias="X-Eternitas-Event"),

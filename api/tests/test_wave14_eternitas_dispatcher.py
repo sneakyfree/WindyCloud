@@ -65,6 +65,39 @@ async def test_dispatcher_routes_trust_changed_to_hmac_handler(client):
 
 
 @pytest.mark.asyncio
+async def test_dispatcher_accepts_api_v1_prefixed_path(client):
+    """The dispatcher must accept the /api/v1/webhooks/eternitas path too.
+
+    The Eternitas platform registry has historically been seeded with the
+    /api/v1-prefixed variant; a no-prefix-only mount would 404 it and silently
+    dead-letter passport revocations. This asserts the dual mount routes it to
+    the same handler (would be 404 without the fix).
+    """
+    body = json.dumps(
+        {
+            "event": "trust.changed",
+            "passport_number": "ET26-WXYZ-9999",
+            "reason": "manual_adjustment",
+        }
+    ).encode()
+    resp = await client.post(
+        "/api/v1/webhooks/eternitas",
+        content=body,
+        headers={
+            "Content-Type": "application/json",
+            "X-Eternitas-Event": "trust.changed",
+            "X-Eternitas-Signature": _sign_hmac(body),
+            "X-Eternitas-Timestamp": str(int(time.time())),
+            "X-Eternitas-Delivery": "dlv-trust-apiv1",
+        },
+    )
+    assert resp.status_code == 200, resp.text
+    data = resp.json()
+    assert data["status"] == "invalidated"
+    assert data["passport_number"] == "ET26-WXYZ-9999"
+
+
+@pytest.mark.asyncio
 async def test_dispatcher_rejects_trust_changed_with_bad_hmac(client):
     body = json.dumps({"event": "trust.changed", "passport_number": "ET26-ABCD-1234"}).encode()
     resp = await client.post(
