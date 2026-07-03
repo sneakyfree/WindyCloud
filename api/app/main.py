@@ -172,6 +172,7 @@ def create_app() -> FastAPI:
     from api.app.routes.agent_compat import router as agent_compat_router
     from api.app.routes.analytics import router as analytics_router
     from api.app.routes.archive import router as archive_router
+    from api.app.routes.auth import router as auth_router
     from api.app.routes.billing import router as billing_router
     from api.app.routes.compute import router as compute_router
     from api.app.routes.deeplink import router as deeplink_router
@@ -188,6 +189,7 @@ def create_app() -> FastAPI:
 
     app.include_router(health_router)
     app.include_router(version_router)
+    app.include_router(auth_router, prefix="/api/v1/auth", tags=["auth"])
     app.include_router(storage_router, prefix="/api/v1/storage", tags=["storage"])
     app.include_router(archive_router, prefix="/api/v1/archive", tags=["archive"])
     app.include_router(compute_router, prefix="/api/v1/compute", tags=["compute"])
