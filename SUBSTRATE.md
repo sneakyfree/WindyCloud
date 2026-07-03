@@ -7,38 +7,28 @@
 
 ---
 
-## ⚠ Canonical domain status — `windycloud.com` cutover is an OPERATOR-ONLY blocker (NOT a code/deploy bug)
+## ✅ Canonical domain status — `cloud.windycloud.com` is LIVE (resolved 2026-07-02)
 
-The canonical apex `windycloud.com` (and `cloud.windycloud.com`) is **NOT
-yet serving** as of this writing. This is sometimes referred to in
-ecosystem status reports as the "windycloud cutover FAILED" item — that
-phrasing is misleading. **Nothing is broken in this repo, the container,
-or the deploy pipeline.** The substrate is healthy and serving in
-production; it is only reachable on the **legacy `cloud.` host on the
-old `windyword.ai` zone** (a canonical-banned target — referred to here
-descriptively, never written as a live URL).
+The canonical host **`cloud.windycloud.com` now serves in production, globally.**
+The earlier "windycloud cutover FAILED / NXDOMAIN" status is **resolved**. Root
+cause was a stale DS record GoDaddy held at the `.com` registry, which made
+validating resolvers SERVFAIL even though the A record in Cloudflare's zone was
+correct. That stale DS was deleted on **2026-07-02** and the canonical host now
+resolves + serves everywhere. The substrate also remains reachable on the legacy
+`cloud.` host on the `windyword.ai` zone (dual-served, identical build).
 
-The actual blocker is purely a **registrar / DNS action that only the
-operator (Grant) can perform**:
+**Only remaining item — operator-only, and NOT a Cloud blocker:** the
+**registrar transfer** of `windycloud.com` from GoDaddy → Cloudflare. The
+nameservers already point at Cloudflare (so serving works regardless of who
+holds the registration), but `windycloud.com` is still registered at GoDaddy
+under `clientTransferProhibited`. The 60-day transfer-lock window opens
+**2026-07-21**; the operator-only fix sequence is GoDaddy unlock → obtain
+EPP/auth code → initiate the Cloudflare registrar transfer → wait for approval.
+Draft support messages are staged at `~/Desktop/windycloud-support-messages.md`.
 
-- `windycloud.com` is still registered at **GoDaddy** with
-  `clientTransferProhibited` set; nameservers point at Cloudflare but
-  the registrar transfer was never initiated.
-- An earlier assumption that a scheduled lock-expiry would "auto-flip"
-  GoDaddy → Cloudflare on 2026-05-21 was **wrong**: a lock *expiring*
-  only *permits* a transfer, it does not *initiate* one. Verified via
-  `whois` 2026-05-28 — `dig windycloud.com / cloud.windycloud.com`
-  returns no A record (NXDOMAIN).
-- Fix sequence (operator-only, ~5–7 day approval window): GoDaddy
-  unlock → obtain EPP/auth code → initiate Cloudflare registrar
-  transfer → wait for approval → run the pre-staged 4-step DNS / cert /
-  CORS sequence (`kit-army-config/docs/windycloud-cutover-prep-2026-05-20.md`).
-
-**Implication for everything below:** any recovery step that probes
-`cloud.windycloud.com` will fail with NXDOMAIN until the transfer above
-completes. Until then the live host is the legacy `cloud.` host on the
-old `windyword.ai` zone. Do **not** treat this as a Cloud engineering
-regression — there is no code change in this repo that can resolve it.
+**Implication for everything below:** recovery/verify steps that probe
+`cloud.windycloud.com` now succeed. This is a registration-hygiene cleanup, not
+a functional blocker — Cloud serving, auth, and every consumer work today.
 
 ---
 
