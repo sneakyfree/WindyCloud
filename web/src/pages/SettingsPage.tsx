@@ -15,6 +15,7 @@ export default function SettingsPage() {
   const [retentionDays, setRetentionDays] = useState("90");
   const [saved, setSaved] = useState(false);
   const [jwt, setJwt] = useState("");
+  const [showToken, setShowToken] = useState(false);
 
   const handleSave = () => {
     setSaved(true);
@@ -25,39 +26,51 @@ export default function SettingsPage() {
     <div className="space-y-6 max-w-2xl">
       <h1 className="text-2xl font-semibold">Settings</h1>
 
-      {/* JWT Token (for dev/testing) */}
+      {/* Account — sign-out up front; the raw-token swap lives behind
+          the same collapsed Advanced idiom as the Login page. */}
       <div className="bg-[var(--bg-card)] rounded-xl p-5 border border-[var(--border)]">
-        <h2 className="text-lg font-medium mb-3">Authentication</h2>
+        <h2 className="text-lg font-medium mb-3">Account</h2>
         <div className="space-y-3">
-          <div>
-            <label className="text-sm text-[var(--text-muted)] block mb-1">
-              JWT Token
-            </label>
-            <div className="flex gap-2">
-              <input
-                type="password"
-                value={jwt}
-                onChange={(e) => setJwt(e.target.value)}
-                placeholder="Paste your Windy Word JWT..."
-                className="flex-1 px-3 py-2 rounded-lg bg-[var(--bg)] border border-[var(--border)] text-sm text-[var(--text)] placeholder:text-[var(--text-muted)] outline-none focus:border-[var(--accent)]"
-              />
-              <button
-                onClick={() => {
-                  setToken(jwt);
-                  window.location.reload();
-                }}
-                className="px-4 py-2 rounded-lg bg-[var(--accent)] text-white text-sm hover:bg-[var(--accent-hover)] cursor-pointer"
-              >
-                Save
-              </button>
-            </div>
-          </div>
+          <p className="text-sm text-[var(--text-muted)]">
+            You're signed in with your Windy account.
+          </p>
           <button
             onClick={logout}
             className="flex items-center gap-2 px-3 py-2 rounded-lg border border-[var(--border)] text-sm text-[var(--red)] hover:bg-[var(--bg-hover)] cursor-pointer"
           >
-            <Trash2 className="w-4 h-4" /> Clear Token & Sign Out
+            <Trash2 className="w-4 h-4" /> Sign out
           </button>
+
+          <div className="pt-3 border-t border-[var(--border)]">
+            <button
+              type="button"
+              onClick={() => setShowToken((s) => !s)}
+              className="text-xs text-[var(--text-muted)] hover:text-[var(--text)] cursor-pointer"
+            >
+              {showToken ? "− Hide" : "+ Advanced"}: replace your identity token
+            </button>
+            {showToken && (
+              <div className="flex gap-2 mt-3">
+                <input
+                  type="password"
+                  value={jwt}
+                  onChange={(e) => setJwt(e.target.value)}
+                  placeholder="Paste a Windy identity token..."
+                  className="flex-1 px-3 py-2 rounded-lg bg-[var(--bg)] border border-[var(--border)] text-sm text-[var(--text)] placeholder:text-[var(--text-muted)] outline-none focus:border-[var(--accent)]"
+                />
+                <button
+                  onClick={() => {
+                    setToken(jwt);
+                    window.location.reload();
+                  }}
+                  disabled={!jwt.trim()}
+                  className="px-4 py-2 rounded-lg bg-[var(--accent)] text-white text-sm hover:bg-[var(--accent-hover)] disabled:opacity-50 cursor-pointer"
+                >
+                  Save
+                </button>
+              </div>
+            )}
+          </div>
         </div>
       </div>
 
