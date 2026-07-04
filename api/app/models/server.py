@@ -75,6 +75,11 @@ class DeployFlyRequest(BaseModel):
     region: str = "us-east-1"
     agent_name: str | None = None
     hostname: str | None = None
+    # The agent's own EPT — baked into the VPS bootstrap so the hosted
+    # agent thinks on Windy Mind's free compute with no API key.
+    eternitas_passport_token: str | None = None
+    owner_email: str = ""
+    default_model: str = "windy-mind-auto"
 
 
 class DeployFlyResponse(BaseModel):

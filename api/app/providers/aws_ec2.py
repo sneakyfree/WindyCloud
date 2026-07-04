@@ -80,12 +80,18 @@ class AWSEC2Provider:
     """AWS EC2 VPS provider — implements the VPSProvider protocol."""
 
     def __init__(self) -> None:
-        self._ec2 = boto3.client(
-            "ec2",
-            region_name=settings.aws_region,
-            aws_access_key_id=settings.aws_access_key_id,
-            aws_secret_access_key=settings.aws_secret_access_key,
-        )
+        # In instance-profile mode (no static keys) let boto3 discover
+        # credentials from the EC2 metadata service; passing empty-string
+        # keys would break that.
+        if settings.aws_access_key_id:
+            self._ec2 = boto3.client(
+                "ec2",
+                region_name=settings.aws_region,
+                aws_access_key_id=settings.aws_access_key_id,
+                aws_secret_access_key=settings.aws_secret_access_key,
+            )
+        else:
+            self._ec2 = boto3.client("ec2", region_name=settings.aws_region)
 
     def _resolve_ami(self, image: str, region: str) -> str:
         """Resolve image name to AMI ID."""
@@ -100,6 +106,7 @@ class AWSEC2Provider:
         region: str,
         image: str,
         hostname: str | None = None,
+        user_data: str | None = None,
     ) -> dict[str, Any]:
         plan_config = PLANS.get(plan)
         if not plan_config:
@@ -109,12 +116,19 @@ class AWSEC2Provider:
         instance_type = plan_config["instance_type"]
 
         try:
-            resp = await asyncio.to_thread(
-                self._ec2.run_instances,
+            run_kwargs: dict[str, Any] = dict(
                 ImageId=ami_id,
                 InstanceType=instance_type,
                 MinCount=1,
                 MaxCount=1,
+            )
+            # UserData bootstraps windyfly on first boot (fly_bootstrap).
+            # Without it the instance is a bare, unreachable box.
+            if user_data:
+                run_kwargs["UserData"] = user_data
+            resp = await asyncio.to_thread(
+                self._ec2.run_instances,
+                **run_kwargs,
                 TagSpecifications=[
                     {
                         "ResourceType": "instance",

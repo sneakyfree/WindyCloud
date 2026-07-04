@@ -63,6 +63,9 @@ class Settings(BaseSettings):
     aws_access_key_id: str = ""
     aws_secret_access_key: str = ""
     aws_region: str = "us-east-1"
+    # Use the EC2 host's IAM instance profile for VPS provisioning
+    # instead of static keys (the prod box has windy-cloud-api-user-vps).
+    use_ec2_instance_profile: bool = False
 
     # Deploy host (for CI/CD SSH target)
     deploy_host: str = ""
