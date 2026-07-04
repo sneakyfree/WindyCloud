@@ -88,10 +88,18 @@ GET    /api/v1/storage/plans           Storage plans + pricing (public)
 POST   /api/v1/archive/chat                         Encrypted chat backups (retention support)
 POST   /api/v1/archive/mail                         Mail server backups
 POST   /api/v1/archive/agent                        Agent database backups
+POST   /api/v1/archive/clone                         Clone data (voice/audio/text) for AI avatars
 POST   /api/v1/archive/recordings                   Recording archives
 POST   /api/v1/archive/code-settings                IDE settings sync
 POST   /api/v1/archive/migrate                      Batch metadata registration (service-token)
 GET    /api/v1/archive/retrieve/{product}/{path}    Fetch a previously archived file
+GET    /api/v1/archive/list/{product}               List archived files for the caller (newest first)
+```
+
+### Auth
+
+```
+POST   /api/v1/auth/login              Email + password login (web portal), returns session
 ```
 
 ### Compute (STT)

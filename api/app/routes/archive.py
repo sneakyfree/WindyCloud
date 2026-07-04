@@ -55,6 +55,9 @@ ARCHIVE_TYPES = {
     "agent": {"product": "windy_fly", "type": "agent_backup"},
     "recordings": {"product": "windy_pro", "type": "recording"},
     "code-settings": {"product": "windy_code", "type": "settings"},
+    # Clone data — voice/audio/text a user uploads to build their AI
+    # avatar (ADR-028 planned consumer). Long-retention by default.
+    "clone": {"product": "windy_clone", "type": "clone_data"},
 }
 
 
@@ -224,6 +227,18 @@ async def archive_agent(
     return await _archive_upload("agent", file, metadata, user, db, filename)
 
 
+@router.post("/clone", response_model=ArchiveResponse)
+async def archive_clone(
+    file: UploadFile = File(...),
+    metadata: str = Form('{"retention_days": 3650}'),
+    filename: str | None = Form(None),
+    user: AuthenticatedUser = Depends(get_user_or_service),
+    db: AsyncSession = Depends(get_db),
+):
+    """Archive clone data (voice/audio/text) for AI-avatar building."""
+    return await _archive_upload("clone", file, metadata, user, db, filename)
+
+
 @router.post("/recordings", response_model=ArchiveResponse)
 async def archive_recordings(
     file: UploadFile = File(...),
@@ -380,3 +395,43 @@ async def archive_retrieve(
         media_type=content_type,
         headers={"Content-Disposition": f'attachment; filename="{safe_name}"'},
     )
+
+
+@router.get("/list/{product}")
+async def archive_list(
+    product: str,
+    user: AuthenticatedUser = Depends(require_not_frozen),
+    db: AsyncSession = Depends(get_db),
+):
+    """List archived files for the caller under one product, newest first.
+
+    The canonical way any client (Fly backup/restore, Clone, etc.)
+    enumerates what it has stored — pair with GET /retrieve/{product}/
+    {filename} to fetch one. Added 2026-07-04: the archive API had upload
+    + retrieve-by-name but no list, so every backup/restore client was
+    guessing filenames and their list calls 404'd.
+    """
+    result = await db.execute(
+        select(FileRecord)
+        .where(
+            FileRecord.identity_id == user.identity_id,
+            FileRecord.product == product,
+        )
+        .order_by(FileRecord.created_at.desc())
+    )
+    records = result.scalars().all()
+    return {
+        "product": product,
+        "count": len(records),
+        "files": [
+            {
+                "file_id": r.id,
+                "filename": r.filename,
+                "type": r.file_type,
+                "size_bytes": r.size_bytes,
+                "encrypted": r.encrypted,
+                "created_at": r.created_at.isoformat(),
+            }
+            for r in records
+        ],
+    }

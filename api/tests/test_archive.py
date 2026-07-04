@@ -92,3 +92,68 @@ async def test_chat_retention(client):
     )
     files = resp.json()["files"]
     assert len(files) == 3
+
+
+@pytest.mark.asyncio
+async def test_archive_clone(client):
+    """Clone archive endpoint stores voice/audio/text for AI avatars."""
+    resp = await client.post(
+        "/api/v1/archive/clone",
+        files={"file": ("voice.wav", b"audio-bytes", "audio/wav")},
+        data={"metadata": json.dumps({"file_type": "voice"})},
+        headers={"Authorization": "Bearer fake"},
+    )
+    assert resp.status_code == 200
+    body = resp.json()
+    assert body["product"] == "windy_clone"
+    assert body["type"] == "clone_data"
+
+
+@pytest.mark.asyncio
+async def test_archive_list(client):
+    """The list endpoint enumerates a caller's files for a product,
+    newest first — the piece backup/restore clients were missing."""
+    # Upload two agent backups.
+    for name in ("backup-1.enc", "backup-2.enc"):
+        r = await client.post(
+            "/api/v1/archive/agent",
+            files={"file": (name, b"data-" + name.encode(), "application/octet-stream")},
+            data={"metadata": json.dumps({}), "filename": name},
+            headers={"Authorization": "Bearer fake"},
+        )
+        assert r.status_code == 200
+
+    resp = await client.get(
+        "/api/v1/archive/list/windy_fly",
+        headers={"Authorization": "Bearer fake"},
+    )
+    assert resp.status_code == 200
+    body = resp.json()
+    assert body["product"] == "windy_fly"
+    assert body["count"] >= 2
+    names = [f["filename"] for f in body["files"]]
+    assert "backup-1.enc" in names and "backup-2.enc" in names
+    # each entry carries the fields a restore client needs
+    assert all({"file_id", "filename", "size_bytes", "created_at"} <= set(f) for f in body["files"])
+
+
+@pytest.mark.asyncio
+async def test_archive_list_then_retrieve_round_trip(client):
+    """List → retrieve is the canonical backup/restore path."""
+    await client.post(
+        "/api/v1/archive/agent",
+        files={"file": ("rt.enc", b"round-trip-payload", "application/octet-stream")},
+        data={"metadata": json.dumps({}), "filename": "rt.enc"},
+        headers={"Authorization": "Bearer fake"},
+    )
+    listed = (await client.get(
+        "/api/v1/archive/list/windy_fly",
+        headers={"Authorization": "Bearer fake"},
+    )).json()
+    fname = listed["files"][0]["filename"]
+    got = await client.get(
+        f"/api/v1/archive/retrieve/windy_fly/{fname}",
+        headers={"Authorization": "Bearer fake"},
+    )
+    assert got.status_code == 200
+    assert got.content == b"round-trip-payload"

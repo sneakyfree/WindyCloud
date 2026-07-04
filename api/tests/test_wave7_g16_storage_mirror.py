@@ -43,6 +43,7 @@ def _api_paths_under_v1_bare():
         "/api/v1/webhooks",
         "/api/v1/identity",
         "/api/v1/deeplink",
+        "/api/v1/auth",  # web-portal email/password login (PR #61)
     )
     return sorted(
         r.path
