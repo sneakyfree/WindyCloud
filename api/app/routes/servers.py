@@ -30,7 +30,7 @@ router = APIRouter()
 
 
 def _get_provider():
-    if settings.aws_access_key_id:
+    if settings.aws_access_key_id or settings.use_ec2_instance_profile:
         from api.app.providers.aws_ec2 import AWSEC2Provider
 
         return AWSEC2Provider()
@@ -43,7 +43,7 @@ def _get_provider():
 
 def _plans_from_provider():
     """Return plan list — works even without AWS credentials."""
-    if settings.aws_access_key_id:
+    if settings.aws_access_key_id or settings.use_ec2_instance_profile:
         from api.app.providers.aws_ec2 import PLANS
     else:
         from api.app.providers.mock_vps import MOCK_PLANS as PLANS
@@ -308,6 +308,16 @@ async def deploy_fly(
     agent_name = body.agent_name or f"fly-{user.identity_id[:8]}"
     hostname = body.hostname or f"{agent_name}.windyfly.ai"
 
+    # Generate the first-boot bootstrap (installs + starts windyfly,
+    # keyless on Windy Mind if the caller passed its passport token).
+    from api.app.services.fly_bootstrap import render_user_data
+    user_data = render_user_data(
+        agent_name=agent_name,
+        ept_token=body.eternitas_passport_token,
+        owner_email=body.owner_email,
+        default_model=body.default_model,
+    )
+
     try:
         result = await provider.create(
             identity_id=user.identity_id,
@@ -315,6 +325,7 @@ async def deploy_fly(
             region=body.region,
             image="ubuntu-24-04",
             hostname=hostname,
+            user_data=user_data,
         )
     except (ValueError, RuntimeError) as e:
         raise HTTPException(status_code=400, detail=str(e))

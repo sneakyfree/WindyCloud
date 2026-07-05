@@ -69,6 +69,7 @@ class MockVPSProvider:
         region: str = "us-east-1",
         image: str = "ubuntu-24-04",
         hostname: str | None = None,
+        user_data: str | None = None,
     ) -> dict:
         if plan not in MOCK_PLANS:
             raise ValueError(f"Unknown plan: {plan}")
