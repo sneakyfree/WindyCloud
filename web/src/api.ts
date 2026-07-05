@@ -209,6 +209,56 @@ export function deleteServer(
   return apiFetch(`/servers/${serverId}`, { method: "DELETE" });
 }
 
+export interface ServerPlan {
+  plan_id: string;
+  name: string;
+  vcpus: number;
+  ram_gb: number;
+  disk_gb: number;
+  bandwidth_tb: number;
+  price_cents_per_month: number;
+  regions: string[];
+}
+
+export function getServerPlans(): Promise<{ plans: ServerPlan[] }> {
+  return apiFetch("/servers/plans");
+}
+
+export interface DeployFlyResult {
+  server_id: string;
+  status: string;
+  ip_address: string | null;
+  hostname: string | null;
+  plan_id: string;
+  agent_name: string | null;
+  dashboard_url: string | null;
+  message: string;
+}
+
+/**
+ * "Host on VPS" — one click from the portal to a hosted Windy Fly.
+ * Bespoke fetch (not apiFetch) so the component can map failures to
+ * grandma-friendly copy instead of toasting raw backend detail —
+ * notably the 503 while prod has no AWS credentials wired.
+ */
+export async function deployFly(body: {
+  plan: string;
+  agent_name?: string;
+}): Promise<DeployFlyResult> {
+  const res = await fetch(`${API_BASE}/servers/deploy-fly`, {
+    method: "POST",
+    headers: jsonHeaders(),
+    body: JSON.stringify(body),
+  });
+  if (res.status === 503) throw new Error("vps_unavailable");
+  if (res.status === 409) throw new Error("server_limit");
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({ detail: res.statusText }));
+    throw new Error(err.detail || res.statusText);
+  }
+  return res.json();
+}
+
 // --- Billing ---
 
 export interface BillingUsage {
