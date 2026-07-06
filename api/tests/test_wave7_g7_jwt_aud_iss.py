@@ -123,14 +123,17 @@ def test_settings_plumbing_passes_values_to_validators(monkeypatch):
     Wave 14 changed Pro's plumbing:
       - audience is forced to "" (Pro doesn't emit `aud`);
       - issuer is unioned with the transitional `windy-identity` value.
-    Eternitas plumbing is unchanged from Wave 7.
+    2026-07-06: Eternitas audience is ALSO forced off — an EPT is a
+    single passport token presented to every platform, so it carries no
+    `aud`, and enforcing WINDY_CLOUD_EXPECTED_AUDIENCE 401'd every real
+    EPT (broke all agent backups). Issuer enforcement stays on.
     """
     from api.app.auth import jwks as jwks_mod
     from api.app.config import settings
 
     monkeypatch.setattr(settings, "windy_cloud_expected_audience", "windy-cloud")
     monkeypatch.setattr(settings, "windy_pro_expected_issuer", "https://account.windyword.ai")
-    monkeypatch.setattr(settings, "eternitas_expected_issuer", "https://api.eternitas.ai")
+    monkeypatch.setattr(settings, "eternitas_expected_issuer", "eternitas.ai")
     jwks_mod._reset_validators_for_testing()
 
     pro = jwks_mod.get_pro_validator()
@@ -140,7 +143,32 @@ def test_settings_plumbing_passes_values_to_validators(monkeypatch):
     assert pro._issuer == ["windy-identity", "https://account.windyword.ai"]
 
     et = jwks_mod.get_eternitas_validator()
-    assert et._audience == "windy-cloud"
-    assert et._issuer == "https://api.eternitas.ai"
+    # 2026-07-06: aud enforcement off for EPTs (they carry no `aud`),
+    # even though WINDY_CLOUD_EXPECTED_AUDIENCE is set — matches Pro.
+    assert et._audience is None
+    # Issuer stays enforced — the real identity check for EPTs.
+    assert et._issuer == "eternitas.ai"
 
     jwks_mod._reset_validators_for_testing()
+
+
+def test_eternitas_ept_shape_validates_issuer_on_audience_off():
+    """Regression (2026-07-06): an EPT — issuer eternitas.ai, NO `aud`
+    claim — must validate when the validator is configured the way
+    get_eternitas_validator now builds it (audience off, issuer on).
+
+    Before the fix the Eternitas validator was built with
+    audience="windy-cloud", so PyJWT raised MissingRequiredClaimError on
+    every real EPT and 401'd all agent backups against Cloud."""
+    priv, pub = _es256_keypair()
+    v = _make_validator(pub, audience="", issuer="eternitas.ai")
+
+    ept = _mint(priv, iss="eternitas.ai", sub="ET26-T11V-NPD1")  # no aud
+    claims = v.validate_token(ept)
+    assert claims["iss"] == "eternitas.ai"
+    assert claims["sub"] == "ET26-T11V-NPD1"
+
+    # Issuer is still enforced — a wrong issuer is rejected.
+    wrong = _mint(priv, iss="https://eternitas.windyword.ai")
+    with pytest.raises(pyjwt.InvalidIssuerError):
+        v.validate_token(wrong)

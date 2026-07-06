@@ -151,9 +151,22 @@ def get_eternitas_validator() -> JWKSValidator:
     if _eternitas_validator is None:
         from api.app.config import settings
 
+        # Audience enforcement is paused for Eternitas tokens too — for
+        # the SAME reason it's paused for Pro tokens above (see
+        # get_pro_validator). An Eternitas Passport Token (EPT) carries
+        # NO `aud` claim by design: it's a single passport credential the
+        # agent presents to EVERY platform (Mail, Chat, Cloud, Mind), so
+        # it cannot be minted for one audience. Passing
+        # WINDY_CLOUD_EXPECTED_AUDIENCE through here made PyJWT raise
+        # MissingRequiredClaimError("aud") on every real EPT — which
+        # 401'd every agent backup/restore against Cloud (surfaced
+        # 2026-07-06 debugging Windy 0's failing backup: the Wave-14 fix
+        # paused this for Pro but missed the symmetric EPT case). Issuer
+        # enforcement stays on — that's the real identity check; audience
+        # re-enables only if/when EPTs start carrying aud.
         _eternitas_validator = JWKSValidator(
             settings.eternitas_jwks_url,
-            audience=settings.windy_cloud_expected_audience,
+            audience="",
             issuer=settings.eternitas_expected_issuer,
         )
     return _eternitas_validator

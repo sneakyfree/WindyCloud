@@ -100,8 +100,19 @@ class R2StorageProvider:
             "windy-file-id": file_id,
         }
         if metadata:
-            # Filter out reserved internal tags to prevent user overwrite
-            tags.update({k: v for k, v in metadata.items() if k not in _RESERVED_TAG_KEYS})
+            # Filter out reserved internal tags to prevent user overwrite.
+            # Coerce every value to str: S3/R2 object metadata is str→str,
+            # and boto3's validate_ascii_metadata calls .encode() on each
+            # value — a bool/int (callers send e.g. encrypted=True,
+            # size_bytes=123, retention_count=5) raised
+            # "AttributeError: 'bool' object has no attribute 'encode'" →
+            # 500 on every real backup. Metadata comes back as strings on
+            # download anyway, so stringifying here is lossless.
+            tags.update({
+                k: str(v)
+                for k, v in metadata.items()
+                if k not in _RESERVED_TAG_KEYS
+            })
 
         await asyncio.to_thread(
             self._client.put_object,
