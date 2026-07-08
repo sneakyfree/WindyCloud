@@ -185,6 +185,29 @@ async def _do_archive_upload(
     await _enforce_retention(db, provider, user.identity_id, product, file_type, retention_count)
     await db.commit()
 
+    # Fire-and-forget telemetry (ADR-WA-001). Content-free: product,
+    # file type, size, encrypted flag, actor id only — never filename or
+    # file bytes. Never blocks or raises (see telemetry.emit).
+    from api.app.telemetry import emit
+
+    size_bytes = int(result["size"])
+    emit(
+        "storage.provisioned",
+        actor_id=user.identity_id,
+        metadata={
+            "product": product,
+            "file_type": file_type,
+            "size_bytes": size_bytes,
+            "encrypted": bool(encrypted),
+            "via": user.source,
+        },
+    )
+    emit(
+        "quota.consumed",
+        actor_id=user.identity_id,
+        metadata={"product": product, "bytes_added": size_bytes},
+    )
+
     return ArchiveResponse(
         file_id=result["file_id"],
         key=result["key"],

@@ -135,6 +135,11 @@ class Settings(BaseSettings):
     # Pricing page (for upgrade redirects)
     pricing_url: str = "https://windyword.ai/pricing"
 
+    # Windy Admin telemetry (ADR-WA-001). Fire-and-forget; inert unless
+    # both are set. See api/app/telemetry.py.
+    windy_admin_ingest_url: str = ""
+    windy_admin_ingest_token: str = ""
+
     # Mock providers (for testing/dev without real cloud credentials)
     use_mock_providers: bool = False
 
