@@ -9,6 +9,7 @@ from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from api.app.auth.dependencies import AuthenticatedUser, get_current_user
+from api.app.auth.webhook import require_not_blocked_for_write
 from api.app.config import settings
 from api.app.db.engine import get_db
 from api.app.db.models import ServerRecord
@@ -62,7 +63,9 @@ async def list_plans():
 @router.post("/create", response_model=ServerCreateResponse)
 async def create_server(
     body: ServerCreateRequest,
-    user: AuthenticatedUser = Depends(get_current_user),
+    # [B4] Provisioning spends real money — gate on the write-path trust check
+    # (403 for a frozen/revoked identity; fail-closed 503 if Trust is unreachable).
+    user: AuthenticatedUser = Depends(require_not_blocked_for_write),
     db: AsyncSession = Depends(get_db),
 ):
     provider = _get_provider()
@@ -269,7 +272,8 @@ async def delete_server(
 @router.post("/deploy-fly", response_model=DeployFlyResponse)
 async def deploy_fly(
     body: DeployFlyRequest,
-    user: AuthenticatedUser = Depends(get_current_user),
+    # [B4] Provisioning spends real money — gate on the write-path trust check.
+    user: AuthenticatedUser = Depends(require_not_blocked_for_write),
     db: AsyncSession = Depends(get_db),
 ):
     """Provision an EC2 instance pre-configured for Windy Fly agent hosting.

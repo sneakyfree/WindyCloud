@@ -125,6 +125,17 @@ async def test_billing_sync_returns_usage(client):
 
 
 @pytest.mark.asyncio
+async def test_billing_sync_cross_identity_forbidden(client):
+    """[B2] A non-admin user may not sync another identity's usage (IDOR)."""
+    resp = await client.post(
+        "/api/v1/billing/sync",
+        json={"windy_identity_id": "someone-else-999"},
+        headers={"Authorization": "Bearer fake"},
+    )
+    assert resp.status_code == 403
+
+
+@pytest.mark.asyncio
 async def test_free_tier_compute(client):
     """First 10 minutes of STT should be free."""
     resp = await client.post(

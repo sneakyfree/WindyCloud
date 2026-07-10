@@ -71,6 +71,22 @@ async def get_current_user(
     )
 
 
+def is_admin(user: AuthenticatedUser) -> bool:
+    """True when the caller holds an admin scope/type or is in the bootstrap
+    admin allowlist. Shared by require_admin and cross-identity gates (B2)."""
+    from api.app.config import settings
+
+    claims = user.claims
+    scopes = claims.get("scopes") or []
+    if isinstance(scopes, str):
+        scopes = [s.strip() for s in scopes.split() if s.strip()]
+    if any(s in scopes for s in ("admin", "windy_cloud:admin")):
+        return True
+    if claims.get("type") == "admin":
+        return True
+    return user.identity_id in settings.admin_identity_ids_list
+
+
 async def require_admin(
     user: AuthenticatedUser = Depends(get_current_user),
 ) -> AuthenticatedUser:
