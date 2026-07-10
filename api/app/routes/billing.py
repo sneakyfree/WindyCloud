@@ -519,14 +519,27 @@ async def get_plan(
     }
 
 
-@router.post("/plan/upgrade")
+class UpgradeRequest(BaseModel):
+    windy_identity_id: str
+    plan_id: str
+
+
+@router.post("/plan/upgrade", dependencies=[Depends(verify_service_token)])
 async def upgrade_plan(
-    body: dict,
-    user: AuthenticatedUser = Depends(get_current_user),
+    body: UpgradeRequest,
     db: AsyncSession = Depends(get_db),
 ):
-    """Upgrade user's storage plan. Called after Stripe payment confirmation."""
-    new_plan_id = body.get("plan_id", "")
+    """Set a user's storage plan to a paid tier.
+
+    [B3 fix] Service-authenticated (X-Service-Token), identity taken from the
+    body — mirrors /allocate. Previously this route was reachable with a plain
+    user JWT and trusted a client-supplied plan_id, so any free user could
+    POST {"plan_id":"max"} and self-grant the 5 TB quota with NO payment. Paid
+    upgrades must be driven server-side by the payment/entitlement service AFTER
+    it verifies the Stripe payment; a client "Upgrade" button must go through
+    that service, never call this endpoint directly.
+    """
+    new_plan_id = body.plan_id
     tiers = _plan_tiers()
     if new_plan_id not in tiers:
         from fastapi import HTTPException
@@ -534,14 +547,14 @@ async def upgrade_plan(
         raise HTTPException(status_code=400, detail=f"Unknown plan: {new_plan_id}")
 
     tier = tiers[new_plan_id]
-    result = await db.execute(select(UserPlan).where(UserPlan.identity_id == user.identity_id))
+    result = await db.execute(select(UserPlan).where(UserPlan.identity_id == body.windy_identity_id))
     plan = result.scalar_one_or_none()
     if plan:
         plan.plan_id = new_plan_id
         plan.quota_bytes = tier["quota_bytes"]
     else:
         plan = UserPlan(
-            identity_id=user.identity_id,
+            identity_id=body.windy_identity_id,
             plan_id=new_plan_id,
             quota_bytes=tier["quota_bytes"],
         )
