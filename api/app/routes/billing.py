@@ -4,12 +4,12 @@ from __future__ import annotations
 
 from datetime import datetime, timezone
 
-from fastapi import APIRouter, Depends, Query
+from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import BaseModel
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from api.app.auth.dependencies import AuthenticatedUser, get_current_user
+from api.app.auth.dependencies import AuthenticatedUser, get_current_user, is_admin
 from api.app.auth.webhook import verify_service_token
 from api.app.config import settings
 from api.app.db.engine import get_db
@@ -181,8 +181,20 @@ async def billing_sync(
     user: AuthenticatedUser = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
-    """Service-to-service endpoint for Windy Pro to pull usage data for Stripe billing."""
-    identity_id = body.windy_identity_id
+    """Service-to-service endpoint for Windy Pro to pull usage data for Stripe billing.
+
+    [B2] Cross-identity pulls are an admin/service operation (Windy Pro's billing
+    sync). An ordinary authenticated user may sync only their OWN identity — reading
+    another identity's billing was a cross-tenant IDOR.
+    """
+    identity_id = user.identity_id
+    if body.windy_identity_id and body.windy_identity_id != identity_id:
+        if not is_admin(user):
+            raise HTTPException(
+                status_code=403,
+                detail="Not authorized to sync another identity's usage",
+            )
+        identity_id = body.windy_identity_id
     month = _current_month()
 
     # Storage usage
