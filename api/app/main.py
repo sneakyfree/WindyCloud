@@ -10,10 +10,12 @@ import logging
 from contextlib import asynccontextmanager
 from pathlib import Path
 
-from fastapi import FastAPI
+from fastapi import FastAPI, Request
+from fastapi.exception_handlers import http_exception_handler
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import HTMLResponse
+from fastapi.responses import FileResponse, HTMLResponse
 from fastapi.staticfiles import StaticFiles
+from starlette.exceptions import HTTPException as StarletteHTTPException
 
 from api.app.__version__ import __version__
 from api.app.config import settings
@@ -217,14 +219,71 @@ def create_app() -> FastAPI:
     # event handlers above. No prefix — the path is literal.
     app.include_router(eternitas_dispatcher_router, include_in_schema=False)
 
-    # Static files (PWA manifest, landing page, service worker)
+    # Static files (PWA manifest, service worker)
     app.mount("/static", StaticFiles(directory=str(STATIC_DIR)), name="static")
 
-    @app.get("/", response_class=HTMLResponse, include_in_schema=False)
-    async def landing():
-        return (STATIC_DIR / "index.html").read_text()
+    # Serve the built React dashboard (Login / Files / Compute / Servers /
+    # Billing / Settings) from the API process so cloud.windycloud.com is an
+    # actual web app instead of a JSON host with a dead splash. Previously the
+    # portal was never deployed and every dashboard route 404'd (SOTU-2). The
+    # SPA owns "/" (its router redirects an anonymous visitor to /login), so it
+    # replaces the old static marketing splash whose only CTA (/docs) 404'd in
+    # prod — cloud.windycloud.com is the app host; marketing lives on the apex.
+    spa_mounted = _mount_spa(app)
+
+    if not spa_mounted:
+        # API-only checkout / CI (no built dashboard): keep the minimal landing
+        # so "/" still answers with an HTML page + security headers.
+        @app.get("/", response_class=HTMLResponse, include_in_schema=False)
+        async def landing():
+            return (STATIC_DIR / "index.html").read_text()
 
     return app
+
+
+# Top-level path segments that must stay real API/infra surface — the SPA
+# fallback must never serve index.html for these (an /api/... 404 has to remain
+# a JSON 404, not a 200 HTML shell that breaks probing clients).
+_RESERVED_PREFIXES = (
+    "api", "health", "version", "docs", "redoc", "openapi.json",
+    "static", "webhooks",
+)
+
+
+def _mount_spa(app: FastAPI) -> bool:
+    """Serve the Vite dashboard via a 404 fallback (yields to every real route).
+
+    Returns True when the dashboard was mounted, False when its build output is
+    absent (so the caller can fall back to the minimal landing).
+    """
+    dist = Path(settings.web_dist_dir).resolve()
+    index = dist / "index.html"
+    if not index.is_file():
+        logger.info("SPA disabled — %s has no index.html", dist)
+        return False
+
+    assets = dist / "assets"
+    if assets.is_dir():
+        app.mount("/assets", StaticFiles(directory=str(assets)), name="spa-assets")
+
+    async def _spa_or_404(request: Request, exc: StarletteHTTPException):
+        full_path = request.url.path.lstrip("/")
+        head = full_path.split("/", 1)[0]
+        if (
+            exc.status_code == 404
+            and request.method in ("GET", "HEAD")
+            and head not in _RESERVED_PREFIXES
+        ):
+            if full_path:
+                candidate = (dist / full_path).resolve()
+                if candidate.is_file() and candidate.is_relative_to(dist):
+                    return FileResponse(candidate)
+            # Client-side route (/login, /files, …) or root: hand over the shell.
+            return FileResponse(index, headers={"Cache-Control": "no-cache"})
+        return await http_exception_handler(request, exc)
+
+    app.add_exception_handler(StarletteHTTPException, _spa_or_404)
+    return True
 
 
 app = create_app()

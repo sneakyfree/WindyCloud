@@ -55,4 +55,19 @@ async def login(body: LoginRequest):
         return resp.json()
     if resp.status_code in (400, 401):
         raise HTTPException(status_code=401, detail="Incorrect email or password.")
+    if resp.status_code == 403:
+        # Correct credentials, but sign-in is blocked — almost always an
+        # unverified email. Pass the 403 through with a human message instead
+        # of collapsing it into a generic 502 (mirrors windy-mail #76). Before
+        # this, a real unverified user saw "server error" instead of "verify
+        # your email", and could never learn what to do.
+        detail = "Please verify your email address to finish signing in."
+        try:
+            body = resp.json()
+            reason = body.get("detail") or body.get("error") or body.get("message")
+            if isinstance(reason, str) and reason and reason != "email_verification_required":
+                detail = reason
+        except Exception:
+            pass
+        raise HTTPException(status_code=403, detail=detail)
     raise HTTPException(status_code=502, detail="Sign-in failed. Please try again.")
