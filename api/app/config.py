@@ -17,6 +17,11 @@ class Settings(BaseSettings):
     windy_pro_jwks_url: str = "https://account.windyword.ai/.well-known/jwks.json"
     eternitas_jwks_url: str = "https://api.eternitas.ai/.well-known/eternitas-keys"
 
+    # Built web dashboard (Vite output). The Dockerfile bakes it at
+    # /app/web/dist; when the directory is absent (API-only checkouts, CI) the
+    # SPA routes simply aren't registered and the API runs headless.
+    web_dist_dir: str = "/app/web/dist"
+
     # Optional audience / issuer validation (Wave 7 G7). Empty = accept
     # any signed token from the JWKS (pre-Wave-7 behaviour). Set these in
     # prod to reject tokens minted for another product/audience even if

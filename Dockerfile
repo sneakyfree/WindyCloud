@@ -1,3 +1,12 @@
+# ── Frontend build: compile the React/Vite dashboard to static assets ──
+FROM node:20-alpine AS frontend
+WORKDIR /web
+COPY web/package.json web/package-lock.json ./
+RUN npm ci
+COPY web/ ./
+RUN npm run build
+
+# ── API image ──
 FROM python:3.11-slim
 
 WORKDIR /app
@@ -18,6 +27,9 @@ RUN uv pip install --system --no-cache .
 COPY api/ api/
 COPY alembic/ alembic/
 COPY alembic.ini .
+
+# Bake the built dashboard (served by api.app.main:_mount_spa at web_dist_dir).
+COPY --from=frontend /web/dist ./web/dist
 
 # Create data directory
 RUN mkdir -p data
