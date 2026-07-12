@@ -234,3 +234,34 @@ async def test_landing_page(client):
     assert resp.status_code == 200
     assert "Windy Cloud" in resp.text
     assert "manifest.json" in resp.text
+
+
+@pytest.mark.asyncio
+async def test_upload_sanitizes_hostile_product_and_file_type(client):
+    """Hostile `product` / `file_type` must not inject path segments into the
+    storage key (regression: raw `../../evil` 500'd on R2 and was a traversal
+    write on the local-disk provider). The upload should succeed with the
+    values confined to a safe single-segment slug."""
+    resp = await client.post(
+        "/api/v1/storage/upload",
+        files={"file": ("ok.txt", b"data", "text/plain")},
+        data={"product": "../../evil", "file_type": "../etc"},
+        headers={"Authorization": "Bearer fake"},
+    )
+    assert resp.status_code == 200
+    key = resp.json()["key"]
+    # The key is `{identity}/{product}/{file_type}/{filename}` — the product and
+    # file_type slots must not contain traversal or extra separators.
+    segments = key.split("/")
+    assert ".." not in key
+    # identity / product / file_type / filename == exactly 4 segments
+    assert len(segments) == 4, key
+
+    # And it lists back under the sanitized product name (no slashes).
+    resp = await client.get(
+        "/api/v1/storage/files",
+        headers={"Authorization": "Bearer fake"},
+    )
+    assert resp.status_code == 200
+    products = {f["product"] for f in resp.json()["files"]}
+    assert all("/" not in p and ".." not in p for p in products)

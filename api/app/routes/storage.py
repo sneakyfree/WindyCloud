@@ -50,6 +50,26 @@ def _sanitize_filename(name: str) -> str:
     return name or str(uuid.uuid4())
 
 
+def _sanitize_path_segment(value: str, default: str) -> str:
+    """Restrict a `product` / `file_type` value to a safe slug.
+
+    Unlike /archive/* (fixed ARCHIVE_TYPES whitelist), /storage/upload takes
+    `product` and `file_type` straight from the client and they flow into the
+    storage key `{identity}/{product}/{file_type}/{filename}`. Left raw, a
+    value like `../../evil` injected extra path segments: on R2 that made
+    put_object raise on the malformed key (500 on hostile input), and on the
+    LocalDisk provider it was a real write-outside-prefix traversal. Collapse
+    traversal + confine to a `[A-Za-z0-9._-]` slug so the key stays one
+    segment. Legit callers (windy_chat, recording, general, file, …) are
+    already within this charset, so this is a no-op for them.
+    """
+    value = value.replace("\\", "/").replace("/", "_")
+    value = re.sub(r"\.{2,}", ".", value)  # collapse consecutive dots (.. traversal)
+    value = re.sub(r"[^A-Za-z0-9._-]", "_", value)  # confine to a safe slug charset
+    value = value.strip(". ")
+    return value or default
+
+
 def _get_provider():
     """Return the active storage provider (R2 or local disk)."""
     if settings.r2_configured:
@@ -88,6 +108,10 @@ async def _do_upload(
     # Shared with /archive/* post-Wave-12 (GAP C-1). See services/quota.py.
     await check_quota(db, identity_id=user.identity_id, additional_bytes=len(data))
 
+    # product / file_type are client-controlled here and land in the storage
+    # key — sanitize them to a single safe slug (see _sanitize_path_segment).
+    product = _sanitize_path_segment(product, "general")
+    file_type = _sanitize_path_segment(file_type, "file")
     filename = _sanitize_filename(file.filename or f"{uuid.uuid4()}")
     content_type = file.content_type or "application/octet-stream"
     try:
