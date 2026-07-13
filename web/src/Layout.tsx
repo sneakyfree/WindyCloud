@@ -2,6 +2,8 @@ import {
   Cloud,
   Cpu,
   FileText,
+  Globe,
+  Home,
   LayoutDashboard,
   LogOut,
   Receipt,
@@ -19,6 +21,19 @@ const NAV = [
   { to: "/billing", icon: Receipt, label: "Billing" },
   { to: "/settings", icon: Settings, label: "Settings" },
 ];
+
+// Sibling-cell pages (windy-cloud-domains / windy-cloud-sites) served
+// same-origin by nginx path routing — plain <a>, not router Links. The
+// session rides the FRAGMENT (never ?token= — that seam is closed).
+const CELL_NAV = [
+  { href: "/domains/", icon: Globe, label: "Domains" },
+  { href: "/websites/", icon: Home, label: "Websites" },
+];
+
+function cellHref(href: string): string {
+  const token = localStorage.getItem("windy_jwt");
+  return token ? `${href}#token=${encodeURIComponent(token)}` : href;
+}
 
 export default function Layout() {
   const { pathname } = useLocation();
@@ -55,6 +70,16 @@ export default function Layout() {
               </Link>
             );
           })}
+          {CELL_NAV.map(({ href, icon: Icon, label }) => (
+            <a
+              key={href}
+              href={cellHref(href)}
+              className="flex items-center gap-3 px-3 py-2 rounded-lg text-sm no-underline transition-colors text-[var(--text-muted)] hover:bg-[var(--bg-hover)] hover:text-[var(--text)]"
+            >
+              <Icon className="w-4 h-4" />
+              {label}
+            </a>
+          ))}
         </nav>
 
         <div className="p-2 border-t border-[var(--border)]">
