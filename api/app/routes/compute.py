@@ -22,6 +22,7 @@ from api.app.models.compute import (
     TranscriptionResult,
     TranscriptionSegment,
 )
+from api.app.utils.upload import read_bounded
 
 router = APIRouter()
 
@@ -104,7 +105,8 @@ async def transcribe(
             detail="STT compute is not configured. Set RUNPOD_API_KEY and RUNPOD_ENDPOINT_ID.",
         )
 
-    audio = await file.read()
+    # Chunked read — raises 413 mid-stream if max_upload_size is exceeded.
+    audio = await read_bounded(file, settings.max_upload_size)
     if not audio:
         raise HTTPException(status_code=400, detail="Empty audio file")
 
