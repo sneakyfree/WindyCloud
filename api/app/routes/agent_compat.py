@@ -20,7 +20,8 @@ from __future__ import annotations
 from fastapi import APIRouter, Depends, Query
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from api.app.auth.dependencies import AuthenticatedUser, get_current_user
+from api.app.auth.dependencies import AuthenticatedUser
+from api.app.auth.webhook import require_not_frozen
 from api.app.db.engine import get_db
 from api.app.models.storage import FileListResponse
 from api.app.routes.storage import list_files
@@ -34,7 +35,7 @@ async def list_files_alias(
     file_type: str | None = Query(None),
     limit: int = Query(50, ge=1, le=200),
     offset: int = Query(0, ge=0),
-    user: AuthenticatedUser = Depends(get_current_user),
+    user: AuthenticatedUser = Depends(require_not_frozen),
     db: AsyncSession = Depends(get_db),
 ):
     """Alias for `GET /api/v1/storage/files` — used by windy-agent's

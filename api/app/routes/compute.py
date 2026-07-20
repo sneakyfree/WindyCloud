@@ -10,7 +10,7 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from api.app.auth.dependencies import AuthenticatedUser, get_current_user
-from api.app.auth.webhook import require_not_blocked_for_write
+from api.app.auth.webhook import require_not_blocked_for_write, require_not_frozen
 from api.app.config import settings
 from api.app.db.engine import get_db
 from api.app.db.models import ComputeJob, ComputeUsageRecord
@@ -163,7 +163,7 @@ async def transcribe(
 @router.get("/stt/{job_id}", response_model=STTJobStatus)
 async def get_stt_job(
     job_id: str,
-    user: AuthenticatedUser = Depends(get_current_user),
+    user: AuthenticatedUser = Depends(require_not_frozen),
     db: AsyncSession = Depends(get_db),
 ):
     result = await db.execute(
@@ -204,7 +204,7 @@ async def get_stt_job(
 
 @router.get("/usage", response_model=ComputeUsageResponse)
 async def compute_usage(
-    user: AuthenticatedUser = Depends(get_current_user),
+    user: AuthenticatedUser = Depends(require_not_frozen),
     db: AsyncSession = Depends(get_db),
 ):
     month = _current_month()

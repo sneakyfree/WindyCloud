@@ -19,7 +19,8 @@ from pydantic import BaseModel, Field
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from api.app.auth.dependencies import AuthenticatedUser, get_current_user
+from api.app.auth.dependencies import AuthenticatedUser
+from api.app.auth.webhook import require_not_blocked_for_write, require_not_frozen
 from api.app.db.engine import get_db
 from api.app.db.models import BackupOffer, FileRecord
 from api.app.services.chat_push import send_first_backup_notification
@@ -109,7 +110,7 @@ def _sync_health(last: datetime | None, interval_hours: int) -> str:
 
 @router.get("/status")
 async def sync_status(
-    user: AuthenticatedUser = Depends(get_current_user),
+    user: AuthenticatedUser = Depends(require_not_frozen),
     db: AsyncSession = Depends(get_db),
 ):
     """Per-product sync status with last backup time and health color."""
@@ -188,7 +189,7 @@ class OfferBackupRequest(BaseModel):
 @router.post("/offer-backup", status_code=status.HTTP_200_OK)
 async def offer_backup(
     body: OfferBackupRequest,
-    user: AuthenticatedUser = Depends(get_current_user),
+    user: AuthenticatedUser = Depends(require_not_blocked_for_write),
     db: AsyncSession = Depends(get_db),
 ) -> dict[str, Any]:
     """Queue the first-backup job and fire the Chat push notification.
