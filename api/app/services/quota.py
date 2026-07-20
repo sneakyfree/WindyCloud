@@ -36,6 +36,26 @@ class QuotaExceeded(HTTPException):
         self.quota = quota
 
 
+async def get_quota_bytes(
+    db: AsyncSession,
+    *,
+    identity_id: str,
+) -> int:
+    """The identity's effective storage quota in bytes.
+
+    UserPlan.quota_bytes when a plan row exists — the Eternitas trust
+    multiplier is already baked into that value at allocation time
+    (routes/billing.py::allocate_plan) — otherwise the global
+    `settings.default_storage_quota` for identities with no plan row
+    yet. Display endpoints (routes/billing.py) and the upload gate
+    (check_quota below) both read this, so the quota a user is SHOWN
+    is always the quota we ENFORCE.
+    """
+    row = await db.execute(select(UserPlan).where(UserPlan.identity_id == identity_id))
+    plan = row.scalar_one_or_none()
+    return plan.quota_bytes if plan else settings.default_storage_quota
+
+
 async def check_quota(
     db: AsyncSession,
     *,
@@ -52,9 +72,7 @@ async def check_quota(
     inside the same request, and there's no schema churn if FileRecord
     gains / loses fields.
     """
-    plan_row = await db.execute(select(UserPlan).where(UserPlan.identity_id == identity_id))
-    plan = plan_row.scalar_one_or_none()
-    quota = plan.quota_bytes if plan else settings.default_storage_quota
+    quota = await get_quota_bytes(db, identity_id=identity_id)
 
     usage_row = await db.execute(
         select(func.coalesce(func.sum(FileRecord.size_bytes), 0)).where(

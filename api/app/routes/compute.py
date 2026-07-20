@@ -10,7 +10,7 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from api.app.auth.dependencies import AuthenticatedUser, get_current_user
-from api.app.auth.webhook import require_not_frozen
+from api.app.auth.webhook import require_not_blocked_for_write
 from api.app.config import settings
 from api.app.db.engine import get_db
 from api.app.db.models import ComputeJob, ComputeUsageRecord
@@ -95,7 +95,11 @@ async def transcribe(
     file: UploadFile = File(...),
     language: str | None = Form(None),
     model: str = Form("large-v3"),
-    user: AuthenticatedUser = Depends(require_not_frozen),
+    # Paid GPU path — gate on the write-path trust check (403 for a
+    # frozen/revoked identity; fail-closed 503 if Trust is unreachable),
+    # matching servers.py POST /create. A suspended agent must not burn
+    # compute during an Eternitas outage.
+    user: AuthenticatedUser = Depends(require_not_blocked_for_write),
     db: AsyncSession = Depends(get_db),
 ):
     provider = _get_stt_provider()
