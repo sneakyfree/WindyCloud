@@ -8,8 +8,8 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from api.app.auth.dependencies import AuthenticatedUser, get_current_user
-from api.app.auth.webhook import require_not_blocked_for_write
+from api.app.auth.dependencies import AuthenticatedUser
+from api.app.auth.webhook import require_not_blocked_for_write, require_not_frozen
 from api.app.config import settings
 from api.app.db.engine import get_db
 from api.app.db.models import ServerRecord
@@ -129,7 +129,7 @@ async def create_server(
 
 @router.get("", response_model=ServerListResponse)
 async def list_servers(
-    user: AuthenticatedUser = Depends(get_current_user),
+    user: AuthenticatedUser = Depends(require_not_frozen),
     db: AsyncSession = Depends(get_db),
 ):
     result = await db.execute(
@@ -163,7 +163,7 @@ async def list_servers(
 @router.get("/{server_id}", response_model=ServerInstance)
 async def get_server(
     server_id: str,
-    user: AuthenticatedUser = Depends(get_current_user),
+    user: AuthenticatedUser = Depends(require_not_frozen),
     db: AsyncSession = Depends(get_db),
 ):
     result = await db.execute(
@@ -203,7 +203,7 @@ async def get_server(
 async def server_action(
     server_id: str,
     body: ServerActionRequest,
-    user: AuthenticatedUser = Depends(get_current_user),
+    user: AuthenticatedUser = Depends(require_not_blocked_for_write),
     db: AsyncSession = Depends(get_db),
 ):
     if body.action not in ("start", "stop", "reboot"):
@@ -245,7 +245,7 @@ async def server_action(
 @router.delete("/{server_id}", response_model=ServerDeleteResponse)
 async def delete_server(
     server_id: str,
-    user: AuthenticatedUser = Depends(get_current_user),
+    user: AuthenticatedUser = Depends(require_not_blocked_for_write),
     db: AsyncSession = Depends(get_db),
 ):
     result = await db.execute(

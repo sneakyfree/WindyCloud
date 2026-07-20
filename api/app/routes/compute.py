@@ -159,7 +159,7 @@ async def transcribe(
 @router.get("/stt/{job_id}", response_model=STTJobStatus)
 async def get_stt_job(
     job_id: str,
-    user: AuthenticatedUser = Depends(get_current_user),
+    user: AuthenticatedUser = Depends(require_not_frozen),
     db: AsyncSession = Depends(get_db),
 ):
     result = await db.execute(
@@ -200,7 +200,7 @@ async def get_stt_job(
 
 @router.get("/usage", response_model=ComputeUsageResponse)
 async def compute_usage(
-    user: AuthenticatedUser = Depends(get_current_user),
+    user: AuthenticatedUser = Depends(require_not_frozen),
     db: AsyncSession = Depends(get_db),
 ):
     month = _current_month()

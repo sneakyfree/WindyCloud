@@ -9,8 +9,12 @@ from pydantic import BaseModel
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from api.app.auth.dependencies import AuthenticatedUser, get_current_user, is_admin
-from api.app.auth.webhook import verify_service_token
+from api.app.auth.dependencies import AuthenticatedUser, is_admin
+from api.app.auth.webhook import (
+    require_not_blocked_for_write,
+    require_not_frozen,
+    verify_service_token,
+)
 from api.app.config import settings
 from api.app.db.engine import get_db
 from api.app.db.models import (
@@ -41,7 +45,7 @@ def _current_month() -> str:
 
 @router.get("/usage", response_model=BillingUsageResponse)
 async def billing_usage(
-    user: AuthenticatedUser = Depends(get_current_user),
+    user: AuthenticatedUser = Depends(require_not_frozen),
     db: AsyncSession = Depends(get_db),
 ):
     month = _current_month()
@@ -86,7 +90,7 @@ async def billing_usage(
 @router.get("/history", response_model=BillingHistoryResponse)
 async def billing_history(
     months: int = Query(6, ge=1, le=24),
-    user: AuthenticatedUser = Depends(get_current_user),
+    user: AuthenticatedUser = Depends(require_not_frozen),
     db: AsyncSession = Depends(get_db),
 ):
     # Try billing snapshots first
@@ -143,7 +147,7 @@ async def billing_history(
 
 @router.get("/estimate", response_model=BillingEstimateResponse)
 async def billing_estimate(
-    user: AuthenticatedUser = Depends(get_current_user),
+    user: AuthenticatedUser = Depends(require_not_frozen),
     db: AsyncSession = Depends(get_db),
 ):
     month = _current_month()
@@ -178,7 +182,7 @@ async def billing_estimate(
 @router.post("/sync", response_model=BillingSyncResponse)
 async def billing_sync(
     body: BillingSyncRequest,
-    user: AuthenticatedUser = Depends(get_current_user),
+    user: AuthenticatedUser = Depends(require_not_blocked_for_write),
     db: AsyncSession = Depends(get_db),
 ):
     """Service-to-service endpoint for Windy Pro to pull usage data for Stripe billing.
@@ -247,7 +251,7 @@ async def billing_sync(
 
 @router.get("/summary", response_model=BillingSummaryResponse)
 async def billing_summary(
-    user: AuthenticatedUser = Depends(get_current_user),
+    user: AuthenticatedUser = Depends(require_not_frozen),
     db: AsyncSession = Depends(get_db),
 ):
     """Agent-friendly usage summary — used by Windy Fly's `storage` command."""
@@ -501,7 +505,7 @@ async def billing_allocate(
 
 @router.get("/plan")
 async def get_plan(
-    user: AuthenticatedUser = Depends(get_current_user),
+    user: AuthenticatedUser = Depends(require_not_frozen),
     db: AsyncSession = Depends(get_db),
 ):
     """Get user's current storage plan."""
