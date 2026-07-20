@@ -31,6 +31,7 @@ from api.app.models.billing import (
     ComputeUsageSummary,
     StorageUsageSummary,
 )
+from api.app.services.quota import get_quota_bytes
 
 router = APIRouter()
 
@@ -66,13 +67,18 @@ async def billing_usage(
 
     compute_cost = compute_record.total_cost_cents if compute_record else 0
 
+    # The user's ACTUAL quota (UserPlan.quota_bytes — trust multiplier
+    # already applied at allocation), not the static default. Falls back
+    # to settings.default_storage_quota only when no plan row exists yet.
+    quota = await get_quota_bytes(db, identity_id=user.identity_id)
+
     return BillingUsageResponse(
         identity_id=user.identity_id,
         month=month,
         storage=StorageUsageSummary(
             used_bytes=storage_row[0],
             file_count=storage_row[1],
-            quota_bytes=settings.default_storage_quota,
+            quota_bytes=quota,
         ),
         compute=ComputeUsageSummary(
             total_seconds=compute_record.total_seconds if compute_record else 0.0,
@@ -262,7 +268,9 @@ async def billing_summary(
     )
     storage_row = storage_result.one()
     used_bytes = storage_row[0]
-    quota = settings.default_storage_quota
+    # The user's ACTUAL quota, same source as the upload gate — see
+    # services/quota.py::get_quota_bytes (default only when no plan row).
+    quota = await get_quota_bytes(db, identity_id=user.identity_id)
     pct = round((used_bytes / quota) * 100, 2) if quota > 0 else 0
 
     # Compute
@@ -510,10 +518,17 @@ async def get_plan(
     plan_id = plan.plan_id if plan else "free"
     tiers = _plan_tiers()
     tier = tiers.get(plan_id) or tiers["free"]
+    # Report the user's ACTUAL quota. UserPlan.quota_bytes is the
+    # effective value (base tier quota x Eternitas trust multiplier,
+    # applied at allocation) — the static tier table would silently
+    # discard the multiplier. No plan row yet -> the un-provisioned
+    # fallback quota, matching upload-gate enforcement
+    # (services/quota.py::get_quota_bytes).
+    quota_bytes = plan.quota_bytes if plan else settings.default_storage_quota
     return {
         "plan_id": plan_id,
         "name": tier["name"],
-        "quota_bytes": tier["quota_bytes"],
+        "quota_bytes": quota_bytes,
         "price_cents_per_month": tier["price_cents"],
         "upgrade_url": settings.pricing_url,
     }
