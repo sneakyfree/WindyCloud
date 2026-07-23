@@ -8,9 +8,11 @@ on:
 
 jobs:
   lint:
-    runs-on: ubuntu-latest
+    runs-on: [self-hosted, linux, x64]
     steps:
       - uses: actions/checkout@v4
+      - name: runner-lint (hosted runners are billing-locked)
+        run: bash "$GITHUB_WORKSPACE/.github/lint/lint-runner-labels.sh" "$GITHUB_WORKSPACE/.github/workflows"
       - uses: astral-sh/setup-uv@v4
       - run: uv venv .venv
       - run: uv pip install -e ".[dev]"
@@ -18,7 +20,7 @@ jobs:
       - run: .venv/bin/ruff format --check api/
 
   test:
-    runs-on: ubuntu-latest
+    runs-on: [self-hosted, linux, x64]
     strategy:
       matrix:
         python-version: ["3.11", "3.12"]
@@ -30,7 +32,7 @@ jobs:
       - run: .venv/bin/python -m pytest api/tests/ -v --tb=short
 
   docker:
-    runs-on: ubuntu-latest
+    runs-on: [self-hosted, linux, x64]
     steps:
       - uses: actions/checkout@v4
 
@@ -50,7 +52,7 @@ jobs:
     # Marathon Foundation #7 — alembic round-trip against real Postgres.
     # Catches broken downgrade() implementations at PR time. See
     # ~/kit-army-config/docs/marathon-foundations-program-2026-05-11.md §MF7.
-    runs-on: ubuntu-latest
+    runs-on: [self-hosted, linux, x64]
     services:
       postgres:
         image: postgres:16-alpine
