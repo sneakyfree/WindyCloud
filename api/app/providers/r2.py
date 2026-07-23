@@ -108,11 +108,7 @@ class R2StorageProvider:
             # "AttributeError: 'bool' object has no attribute 'encode'" →
             # 500 on every real backup. Metadata comes back as strings on
             # download anyway, so stringifying here is lossless.
-            tags.update({
-                k: str(v)
-                for k, v in metadata.items()
-                if k not in _RESERVED_TAG_KEYS
-            })
+            tags.update({k: str(v) for k, v in metadata.items() if k not in _RESERVED_TAG_KEYS})
 
         await asyncio.to_thread(
             self._client.put_object,

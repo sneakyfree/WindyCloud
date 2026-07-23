@@ -72,6 +72,7 @@ class TestDeployFlyPassesUserData:
         monkeypatch.setattr(servers, "_get_provider", lambda: _Prov())
         # plan validation reads _plans_from_provider; keep it real via mock plans
         from api.app.providers.mock_vps import MOCK_PLANS
+
         assert "starter" in MOCK_PLANS  # sanity
 
         from api.app.models.server import DeployFlyRequest
@@ -79,11 +80,17 @@ class TestDeployFlyPassesUserData:
         # Call the underlying handler logic through render + provider by
         # exercising render_user_data + the create call the route makes.
         ud = render_user_data(
-            agent_name="fly-test", ept_token="ept-tok", owner_email="o@e.com",
+            agent_name="fly-test",
+            ept_token="ept-tok",
+            owner_email="o@e.com",
         )
         await _Prov().create(
-            identity_id="id1", plan="starter", region="us-east-1",
-            image="ubuntu-24-04", hostname="h", user_data=ud,
+            identity_id="id1",
+            plan="starter",
+            region="us-east-1",
+            image="ubuntu-24-04",
+            hostname="h",
+            user_data=ud,
         )
         assert "user_data" in captured
         assert "ETERNITAS_PASSPORT_TOKEN=ept-tok" in captured["user_data"]

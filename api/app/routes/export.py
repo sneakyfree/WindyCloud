@@ -227,8 +227,6 @@ async def download_export(
         content=data,
         media_type=content_type or "application/zip",
         headers={
-            "Content-Disposition": (
-                f'attachment; filename="windy-cloud-export-{job.id[:8]}.zip"'
-            ),
+            "Content-Disposition": (f'attachment; filename="windy-cloud-export-{job.id[:8]}.zip"'),
         },
     )

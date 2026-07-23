@@ -245,8 +245,14 @@ def create_app() -> FastAPI:
 # fallback must never serve index.html for these (an /api/... 404 has to remain
 # a JSON 404, not a 200 HTML shell that breaks probing clients).
 _RESERVED_PREFIXES = (
-    "api", "health", "version", "docs", "redoc", "openapi.json",
-    "static", "webhooks",
+    "api",
+    "health",
+    "version",
+    "docs",
+    "redoc",
+    "openapi.json",
+    "static",
+    "webhooks",
 )
 
 

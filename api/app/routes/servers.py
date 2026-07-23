@@ -315,6 +315,7 @@ async def deploy_fly(
     # Generate the first-boot bootstrap (installs + starts windyfly,
     # keyless on Windy Mind if the caller passed its passport token).
     from api.app.services.fly_bootstrap import render_user_data
+
     user_data = render_user_data(
         agent_name=agent_name,
         ept_token=body.eternitas_passport_token,

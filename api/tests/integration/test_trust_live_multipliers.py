@@ -12,7 +12,11 @@ We assert what the live contract says — the server applies
 has `top_secret` clearance will cap at 3.0 even in the `exceptional` band.
 That's by design, documented in eternitas/docs/trust-api.md.
 
-Skipped when Eternitas isn't reachable.
+Opt-in: set ETERNITAS_URL explicitly to run these (and the target must be
+reachable). Without the env var they skip — the settings default
+(http://localhost:8500) can resolve to an unrelated resident Eternitas
+container on a shared box (e.g. the Kit 0 self-hosted CI runner), which
+doesn't carry the ET26-TEST-* seed data and must not be poked by CI.
 """
 
 from __future__ import annotations
@@ -28,7 +32,8 @@ from api.app.db.models import Base, IdentityBridge, UserPlan
 from api.app.routes.billing import allocate_plan
 from api.app.services.trust_client import TrustClient, _reset_trust_client_for_testing
 
-ETERNITAS_URL = os.environ.get("ETERNITAS_URL") or settings.eternitas_url
+_EXPLICIT_ETERNITAS_URL = os.environ.get("ETERNITAS_URL")
+ETERNITAS_URL = _EXPLICIT_ETERNITAS_URL or settings.eternitas_url
 
 SEEDED_PASSPORTS = {
     "ET26-TEST-EXCP": "exceptional",
@@ -50,8 +55,12 @@ def _eternitas_reachable() -> bool:
 
 
 pytestmark = pytest.mark.skipif(
-    not _eternitas_reachable(),
-    reason=f"Eternitas not reachable at {ETERNITAS_URL}",
+    not _EXPLICIT_ETERNITAS_URL or not _eternitas_reachable(),
+    reason=(
+        f"Live Eternitas tests are opt-in: export ETERNITAS_URL (got "
+        f"{_EXPLICIT_ETERNITAS_URL!r}) and ensure it is reachable "
+        f"(probing {ETERNITAS_URL})"
+    ),
 )
 
 

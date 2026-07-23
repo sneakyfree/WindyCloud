@@ -66,12 +66,19 @@ def test_default_storage_quota_tracks_free_tier():
 
 
 @pytest.mark.asyncio
-async def test_upgrade_to_max_tier_accepted(client):
-    """/billing/plan/upgrade now accepts 'max' (pre-fix it 400'd)."""
+async def test_upgrade_to_max_tier_accepted(client, monkeypatch):
+    """/billing/plan/upgrade now accepts 'max' (pre-fix it 400'd).
+
+    [B3 fix] The route is service-authenticated now — X-Service-Token
+    header + windy_identity_id in the body, mirroring /billing/allocate.
+    """
+    from api.app.config import settings
+
+    monkeypatch.setattr(settings, "service_token", "g17-tok")
     resp = await client.post(
         "/api/v1/billing/plan/upgrade",
-        json={"plan_id": "max"},
-        headers={"Authorization": "Bearer fake"},
+        json={"plan_id": "max", "windy_identity_id": "test-user-001"},
+        headers={"X-Service-Token": "g17-tok"},
     )
     assert resp.status_code == 200, resp.text
     body = resp.json()
@@ -80,12 +87,15 @@ async def test_upgrade_to_max_tier_accepted(client):
 
 
 @pytest.mark.asyncio
-async def test_upgrade_to_basic_rejected(client):
+async def test_upgrade_to_basic_rejected(client, monkeypatch):
     """'basic' is no longer a valid tier — an upgrade call to it 400s."""
+    from api.app.config import settings
+
+    monkeypatch.setattr(settings, "service_token", "g17-tok")
     resp = await client.post(
         "/api/v1/billing/plan/upgrade",
-        json={"plan_id": "basic"},
-        headers={"Authorization": "Bearer fake"},
+        json={"plan_id": "basic", "windy_identity_id": "test-user-001"},
+        headers={"X-Service-Token": "g17-tok"},
     )
     assert resp.status_code == 400
     assert "basic" in resp.text
