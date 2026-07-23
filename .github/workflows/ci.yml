@@ -61,14 +61,17 @@ jobs:
           POSTGRES_PASSWORD: cloud
           POSTGRES_DB: cloud
         ports:
-          - 5432:5432
+          # Kit 0 is a shared box: host 5432 is contended (resident
+          # containers + other repos' CI services), so bind a high,
+          # repo-unique host port. FissionClips CI uses 25432.
+          - 15432:5432
         options: >-
           --health-cmd "pg_isready -U cloud"
           --health-interval 5s
           --health-timeout 5s
           --health-retries 10
     env:
-      DATABASE_URL: "postgresql+asyncpg://cloud:cloud@localhost:5432/cloud"
+      DATABASE_URL: "postgresql+asyncpg://cloud:cloud@localhost:15432/cloud"
     steps:
       - uses: actions/checkout@v4
       - uses: astral-sh/setup-uv@v4
