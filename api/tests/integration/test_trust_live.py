@@ -38,7 +38,8 @@ from api.app.services.trust_client import (
     _reset_trust_client_for_testing,
 )
 
-ETERNITAS_URL = os.environ.get("ETERNITAS_URL") or settings.eternitas_url
+_EXPLICIT_ETERNITAS_URL = os.environ.get("ETERNITAS_URL")
+ETERNITAS_URL = _EXPLICIT_ETERNITAS_URL or settings.eternitas_url
 KNOWN_PASSPORT = os.environ.get("ETERNITAS_TEST_PASSPORT")
 UNKNOWN_PASSPORT = "ET-99999-NEVERREAL"
 
@@ -52,9 +53,15 @@ def _eternitas_reachable() -> bool:
         return False
 
 
+# Opt-in via explicit ETERNITAS_URL: on a shared box (e.g. the Kit 0
+# self-hosted CI runner) the settings default of localhost:8500 can hit an
+# unrelated resident Eternitas container. CI must not poke that.
 pytestmark = pytest.mark.skipif(
-    not _eternitas_reachable(),
-    reason=f"Eternitas not reachable at {ETERNITAS_URL} — start it per docstring",
+    not _EXPLICIT_ETERNITAS_URL or not _eternitas_reachable(),
+    reason=(
+        f"Live Eternitas tests are opt-in: export ETERNITAS_URL and start "
+        f"Eternitas per docstring (probing {ETERNITAS_URL})"
+    ),
 )
 
 

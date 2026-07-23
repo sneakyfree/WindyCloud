@@ -9,7 +9,7 @@ from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile, s
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from api.app.auth.dependencies import AuthenticatedUser, get_current_user
+from api.app.auth.dependencies import AuthenticatedUser
 from api.app.auth.webhook import require_not_blocked_for_write, require_not_frozen
 from api.app.config import settings
 from api.app.db.engine import get_db

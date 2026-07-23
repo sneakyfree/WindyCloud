@@ -38,8 +38,8 @@ class _FakeClient:
 
 @pytest.mark.asyncio
 async def test_login_403_passes_through(monkeypatch):
-    from api.app.routes import auth as auth_module
     from api.app.main import create_app
+    from api.app.routes import auth as auth_module
 
     fake = _FakeResp(403, {"detail": "email_verification_required"})
     monkeypatch.setattr(auth_module.httpx, "AsyncClient", lambda *a, **k: _FakeClient(fake))
@@ -55,8 +55,8 @@ async def test_login_403_passes_through(monkeypatch):
 
 @pytest.mark.asyncio
 async def test_login_wrong_password_still_401(monkeypatch):
-    from api.app.routes import auth as auth_module
     from api.app.main import create_app
+    from api.app.routes import auth as auth_module
 
     fake = _FakeResp(401, {"detail": "bad"})
     monkeypatch.setattr(auth_module.httpx, "AsyncClient", lambda *a, **k: _FakeClient(fake))

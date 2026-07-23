@@ -245,11 +245,15 @@ async def test_get_plan_reads_existing_plan(client, db_session):
 
 
 @pytest.mark.asyncio
-async def test_upgrade_plan_unknown_tier_400(client):
+async def test_upgrade_plan_unknown_tier_400(client, monkeypatch):
+    # [B3 fix] route is service-authenticated: X-Service-Token + identity in body
+    from api.app.config import settings
+
+    monkeypatch.setattr(settings, "service_token", "cov-tok")
     resp = await client.post(
         "/api/v1/billing/plan/upgrade",
-        json={"plan_id": "titanium"},
-        headers={"Authorization": "Bearer fake"},
+        json={"plan_id": "titanium", "windy_identity_id": "cov-user"},
+        headers={"X-Service-Token": "cov-tok"},
     )
     assert resp.status_code == 400
 

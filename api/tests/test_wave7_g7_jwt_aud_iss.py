@@ -169,6 +169,6 @@ def test_eternitas_ept_shape_validates_issuer_on_audience_off():
     assert claims["sub"] == "ET26-T11V-NPD1"
 
     # Issuer is still enforced — a wrong issuer is rejected.
-    wrong = _mint(priv, iss="https://eternitas.windyword.ai")
+    wrong = _mint(priv, iss="https://not-eternitas.example.com")
     with pytest.raises(pyjwt.InvalidIssuerError):
         v.validate_token(wrong)

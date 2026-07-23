@@ -19,6 +19,26 @@ from __future__ import annotations
 import pytest
 
 
+def _all_api_route_paths(app):
+    """Every registered API path, flattened across FastAPI versions.
+
+    FastAPI >= 0.139 wraps `include_router` mounts in a lazy
+    `_IncludedRouter` BaseRoute, so `app.routes` no longer contains one
+    APIRoute per endpoint. Those wrappers expose the fully-prefixed
+    effective routes via `effective_route_contexts()` — use that when
+    present, fall back to plain APIRoute iteration on older versions.
+    """
+    from fastapi.routing import APIRoute
+
+    paths = []
+    for r in app.routes:
+        if isinstance(r, APIRoute):
+            paths.append(r.path)
+        elif hasattr(r, "effective_route_contexts"):
+            paths.extend(ctx.path for ctx in r.effective_route_contexts())
+    return paths
+
+
 def _api_paths_under_v1_bare():
     """Return any /api/v1/* path that isn't inside a versioned prefix.
 
@@ -26,8 +46,6 @@ def _api_paths_under_v1_bare():
     the public status endpoint. Everything else means the double-mount
     came back.
     """
-    from fastapi.routing import APIRoute
-
     from api.app.main import create_app
 
     app = create_app()
@@ -46,11 +64,9 @@ def _api_paths_under_v1_bare():
         "/api/v1/auth",  # web-portal email/password login (PR #61)
     )
     return sorted(
-        r.path
-        for r in app.routes
-        if isinstance(r, APIRoute)
-        and r.path.startswith("/api/v1/")
-        and not any(r.path.startswith(p) for p in known_prefixes)
+        path
+        for path in _all_api_route_paths(app)
+        if path.startswith("/api/v1/") and not any(path.startswith(p) for p in known_prefixes)
     )
 
 
@@ -68,12 +84,10 @@ def test_no_storage_router_mirror_routes():
 def test_shadow_endpoints_are_gone():
     """These were the shadow paths the double-mount exposed pre-G16.
     They must all 404 now."""
-    from fastapi.routing import APIRoute
-
     from api.app.main import create_app
 
     app = create_app()
-    live_paths = {r.path for r in app.routes if isinstance(r, APIRoute)}
+    live_paths = set(_all_api_route_paths(app))
     for gone in (
         "/api/v1/upload",
         "/api/v1/usage",

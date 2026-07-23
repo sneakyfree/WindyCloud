@@ -566,7 +566,9 @@ async def upgrade_plan(
         raise HTTPException(status_code=400, detail=f"Unknown plan: {new_plan_id}")
 
     tier = tiers[new_plan_id]
-    result = await db.execute(select(UserPlan).where(UserPlan.identity_id == body.windy_identity_id))
+    result = await db.execute(
+        select(UserPlan).where(UserPlan.identity_id == body.windy_identity_id)
+    )
     plan = result.scalar_one_or_none()
     if plan:
         plan.plan_id = new_plan_id
