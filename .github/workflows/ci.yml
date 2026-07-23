@@ -41,12 +41,26 @@ jobs:
 
       - name: Start container and verify health
         run: |
-          docker run -d --name cloud-ci -p 8200:8200 -e USE_MOCK_PROVIDERS=true windy-cloud:ci
-          sleep 3
-          STATUS=$(curl -sf http://localhost:8200/health | python3 -c "import sys,json; print(json.load(sys.stdin)['status'])")
+          # Shared self-hosted box: remove any leftover container from an
+          # aborted run (the name is global), and bind a high, repo-unique
+          # host port so we never race resident containers for 8200.
+          docker rm -f cloud-ci 2>/dev/null || true
+          docker run -d --name cloud-ci -p 18200:8200 -e USE_MOCK_PROVIDERS=true windy-cloud:ci
+          STATUS=""
+          for i in $(seq 1 10); do
+            sleep 3
+            STATUS=$(curl -sf http://localhost:18200/health | python3 -c "import sys,json; print(json.load(sys.stdin)['status'])" || true)
+            [ "$STATUS" = "ok" ] && break
+          done
           echo "Health status: $STATUS"
-          [ "$STATUS" = "ok" ] || exit 1
-          docker stop cloud-ci
+          if [ "$STATUS" != "ok" ]; then
+            docker logs cloud-ci || true
+            exit 1
+          fi
+
+      - name: Cleanup container
+        if: always()
+        run: docker rm -f cloud-ci 2>/dev/null || true
 
   migrations:
     # Marathon Foundation #7 — alembic round-trip against real Postgres.
