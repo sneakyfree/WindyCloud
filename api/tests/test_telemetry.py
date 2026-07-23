@@ -45,8 +45,13 @@ async def test_emit_builds_content_free_windy_cloud_envelope(monkeypatch):
     telemetry.emit(
         "storage.provisioned",
         actor_id="ET26-TEST-0001",
-        metadata={"product": "agent", "file_type": "backup", "size_bytes": 6_291_963,
-                  "encrypted": True, "via": "service"},
+        metadata={
+            "product": "agent",
+            "file_type": "backup",
+            "size_bytes": 6_291_963,
+            "encrypted": True,
+            "via": "service",
+        },
     )
     # let the scheduled task run
     for _ in range(5):

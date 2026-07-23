@@ -146,10 +146,12 @@ async def test_archive_list_then_retrieve_round_trip(client):
         data={"metadata": json.dumps({}), "filename": "rt.enc"},
         headers={"Authorization": "Bearer fake"},
     )
-    listed = (await client.get(
-        "/api/v1/archive/list/windy_fly",
-        headers={"Authorization": "Bearer fake"},
-    )).json()
+    listed = (
+        await client.get(
+            "/api/v1/archive/list/windy_fly",
+            headers={"Authorization": "Bearer fake"},
+        )
+    ).json()
     fname = listed["files"][0]["filename"]
     got = await client.get(
         f"/api/v1/archive/retrieve/windy_fly/{fname}",

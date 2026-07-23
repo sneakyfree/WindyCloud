@@ -135,7 +135,10 @@ async def test_outage_reads_fail_open_writes_fail_closed(db_session, monkeypatch
         for method, path, kw in READ_ROUTES:
             resp = await ac.request(method, path, headers=HDRS, **kw)
             assert resp.status_code != 403 and resp.status_code != 503, (
-                method, path, resp.status_code, resp.text,
+                method,
+                path,
+                resp.status_code,
+                resp.text,
             )
         for method, path, kw in WRITE_ROUTES:
             resp = await ac.request(method, path, headers=HDRS, **kw)
@@ -163,5 +166,8 @@ async def test_human_is_unaffected_even_during_outage(db_session, monkeypatch):
         for method, path, kw in READ_ROUTES + WRITE_ROUTES:
             resp = await ac.request(method, path, headers=HDRS, **kw)
             assert resp.status_code not in (403, 503), (
-                method, path, resp.status_code, resp.text,
+                method,
+                path,
+                resp.status_code,
+                resp.text,
             )
