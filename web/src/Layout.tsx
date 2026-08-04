@@ -13,6 +13,11 @@ import {
 import { Link, Outlet, useLocation } from "react-router-dom";
 import { logout } from "./api";
 
+// The marketing site at the apex. This console lives on
+// cloud.windycloud.com; the brand is the route back to the main site.
+// In-app "Dashboard" (NAV[0]) still covers "/".
+const HERO_URL = "https://windycloud.com";
+
 const NAV = [
   { to: "/", icon: LayoutDashboard, label: "Dashboard" },
   { to: "/files", icon: FileText, label: "Files" },
@@ -43,12 +48,16 @@ export default function Layout() {
       {/* Sidebar */}
       <aside className="w-56 flex-shrink-0 border-r border-[var(--border)] bg-[var(--bg-card)] flex flex-col">
         <div className="p-4 border-b border-[var(--border)]">
-          <Link to="/" className="flex items-center gap-2 no-underline">
+          <a
+            href={HERO_URL}
+            aria-label="Windy Cloud — go to the main site"
+            className="flex items-center gap-2 no-underline hover:opacity-80 transition-opacity"
+          >
             <Cloud className="w-6 h-6 text-[var(--accent)]" />
             <span className="text-lg font-semibold text-[var(--text)]">
               Windy Cloud
             </span>
-          </Link>
+          </a>
         </div>
 
         <nav className="flex-1 p-2 space-y-0.5">
