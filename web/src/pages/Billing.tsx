@@ -25,8 +25,8 @@ export default function Billing() {
       .catch(() => {});
   }, []);
 
-  const storageCost = usage
-    ? estimateStorageCost(usage.storage.used_bytes)
+  const storageCost = usage && plans.length
+    ? estimateStorageCost(usage.storage.used_bytes, plans)
     : 0;
 
   return (
@@ -124,6 +124,13 @@ export default function Billing() {
       {/* Plans */}
       <div>
         <h2 className="text-lg font-medium mb-3">Storage Plans</h2>
+        {/* One ladder across the ecosystem: a plan bought in Windy Word and a
+            plan bought here are the same plan. See PRICING-TIERS.md. */}
+        <p className="text-sm text-[var(--text-muted)] mb-3">
+          Every paid plan includes Windy Word — the voice-to-text app, cloud
+          transcription and translation come with your storage. Buy from either
+          product and it unlocks both.
+        </p>
         <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
           {plans.map((p) => (
             <div
@@ -145,10 +152,22 @@ export default function Billing() {
   );
 }
 
-function estimateStorageCost(bytes: number): number {
-  const mb = bytes / (1024 * 1024);
-  if (mb <= 500) return 0;
-  if (mb <= 5120) return 200;
-  if (mb <= 51200) return 500;
-  return 1000;
+/**
+ * Smallest plan that covers `bytes` — that's the month's storage cost.
+ *
+ * Derived from the plans fetched from the server, NEVER from a table in this
+ * file. This function used to hardcode its own ladder (500 MB / 5 GB / 50 GB
+ * at $2 / $5 / $10), which matched no real plan and no real price — a fifth
+ * competing copy of the pricing ladder living in the browser.
+ *
+ * Hurricane is skipped: its price is 0 meaning "Custom", so including it would
+ * quote a very large account as free.
+ */
+function estimateStorageCost(bytes: number, plans: StoragePlan[]): number {
+  const billable = plans.filter((p) => p.plan_id !== "hurricane");
+  const ascending = [...billable].sort((a, b) => a.storage_bytes - b.storage_bytes);
+  for (const plan of ascending) {
+    if (bytes <= plan.storage_bytes) return plan.price_cents_per_month;
+  }
+  return ascending.length ? ascending[ascending.length - 1].price_cents_per_month : 0;
 }

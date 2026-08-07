@@ -14,7 +14,7 @@ const STEPS: Step[] = [
     icon: HardDrive,
     title: "Storage",
     blurb:
-      "Every Windy app backs up here automatically — 5 GB free, no setup.",
+      "Every Windy app backs up here automatically — 500 MB free, no setup.",
     color: "var(--accent)",
   },
   {
