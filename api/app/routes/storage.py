@@ -307,6 +307,25 @@ def _human_bytes(n: int) -> str:
     return f"{n:.1f} PB"
 
 
+def _price_display(tier: str, price_cents: int) -> str:
+    """Human price for a plan card.
+
+    Two traps this closes:
+      · `:.0f` rounded $4.99 to "$5" and $8.99 to "$9" — every consumer price
+        on the ladder ends in .99, so the page advertised the wrong number.
+      · price 0 meant "Free", but Hurricane is priced 0 because it is sold per
+        contract. It was being advertised as a free 5 TB plan.
+    """
+    if tier == "hurricane":
+        return "Custom"
+    if price_cents == 0:
+        return "Free"
+    dollars = price_cents / 100
+    if price_cents % 100 == 0:
+        return f"${dollars:.0f}/mo"
+    return f"${dollars:.2f}/mo"
+
+
 def _storage_plans() -> list[StoragePlan]:
     """Wave 7 G17+G18 — one vocab. Reads tier quotas from settings and
     prices from `routes/billing.PLAN_PRICES_CENTS` so every surface
@@ -329,7 +348,7 @@ def _storage_plans() -> list[StoragePlan]:
                 storage_bytes=quotas[tier],
                 storage_display=_human_bytes(quotas[tier]),
                 price_cents_per_month=price,
-                price_display="Free" if price == 0 else f"${price / 100:.0f}/mo",
+                price_display=_price_display(tier, price),
             )
         )
     return plans

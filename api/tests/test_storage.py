@@ -271,3 +271,31 @@ async def test_upload_sanitizes_hostile_product_and_file_type(client):
     assert resp.status_code == 200
     products = {f["product"] for f in resp.json()["files"]}
     assert all("/" not in p and ".." not in p for p in products)
+
+
+# ─── Plan card display (2026-08-07) ───────────────────────────────────────────
+
+
+@pytest.mark.asyncio
+async def test_plan_prices_show_cents_and_hurricane_is_custom(client):
+    """Two live bugs caught on the deployed site, not in a test:
+
+    · `:.0f` rounded $4.99 to "$5" and $8.99 to "$9". EVERY consumer price on
+      the ladder ends in .99, so the page advertised the wrong number on the
+      three plans most people buy.
+    · Hurricane is priced 0 because it is sold per contract. "Free" was the
+      fallback for 0, so a 5 TB enterprise plan advertised itself as free.
+    """
+    resp = await client.get("/api/v1/storage/plans")
+    assert resp.status_code == 200
+    by_id = {p["plan_id"]: p for p in resp.json()["plans"]}
+
+    assert by_id["free"]["price_display"] == "Free"
+    assert by_id["pro"]["price_display"] == "$4.99/mo"
+    assert by_id["translate"]["price_display"] == "$8.99/mo"
+    assert by_id["translate_pro"]["price_display"] == "$14.99/mo"
+    # Whole-dollar prices keep the tidy form.
+    assert by_id["tempest"]["price_display"] == "$49/mo"
+    assert by_id["tornado"]["price_display"] == "$99/mo"
+    # Sold per contract — never "Free".
+    assert by_id["hurricane"]["price_display"] == "Custom"

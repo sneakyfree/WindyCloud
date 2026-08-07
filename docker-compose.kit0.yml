@@ -1,0 +1,48 @@
+# Kit 0 deployment overlay for Windy Cloud.
+#
+# RECONSTRUCTED 2026-08-07 from the running containers after an rsync --delete
+# removed the original (it existed only on this host, never in the repo). Every
+# value below was read back from `docker inspect` on the live, healthy
+# containers, so it reproduces what was actually running.
+#
+# It now lives in the repo as well as on the host — a deploy file that exists in
+# exactly one place, on a server, is one bad sync away from gone.
+services:
+  cloud:
+    build: .
+    image: windy-cloud-cloud
+    env_file:
+      - .env
+    ports:
+      - "127.0.0.1:8240:8200"
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8200/health"]
+      interval: 30s
+      timeout: 5s
+      start_period: 45s
+      retries: 3
+
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_DB: windy_cloud
+      POSTGRES_USER: windy
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+    volumes:
+      - windy-cloud-pgdata:/var/lib/postgresql/data
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U windy -d windy_cloud"]
+      interval: 10s
+      timeout: 5s
+      start_period: 10s
+      retries: 5
+
+volumes:
+  windy-cloud-pgdata:
+    external: true
+    name: windy-cloud_windy-cloud-pgdata
