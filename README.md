@@ -100,6 +100,9 @@ GET    /api/v1/archive/list/{product}               List archived files for the 
 
 ```
 POST   /api/v1/auth/login              Email + password login (web portal), returns session
+POST   /api/v1/auth/checkout           Start Stripe Checkout for a plan (proxied to the
+                                       account-server, which owns the one Stripe integration;
+                                       this service holds no Stripe key)
 ```
 
 ### Compute (STT)

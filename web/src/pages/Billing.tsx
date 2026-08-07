@@ -7,6 +7,7 @@ import {
   getBillingHistory,
   getBillingUsage,
   getPlans,
+  startCheckout,
 } from "../api";
 import { formatBytes, formatCents } from "../util";
 
@@ -14,6 +15,37 @@ export default function Billing() {
   const [usage, setUsage] = useState<BillingUsage | null>(null);
   const [history, setHistory] = useState<BillingHistoryEntry[]>([]);
   const [plans, setPlans] = useState<StoragePlan[]>([]);
+  const [cycle, setCycle] = useState<"monthly" | "yearly">("monthly");
+  const [buying, setBuying] = useState<string | null>(null);
+
+  // Free is not purchasable, and Hurricane is sold by contract, not by card.
+  const isPurchasable = (planId: string) =>
+    planId !== "free" && planId !== "hurricane";
+
+  async function buy(tier: string, billingCycle: "monthly" | "yearly") {
+    setBuying(tier);
+    try {
+      const { url } = await startCheckout(tier, billingCycle);
+      window.location.href = url;
+    } catch {
+      // apiFetch already surfaced the error as a toast.
+      setBuying(null);
+    }
+  }
+
+  // Arriving from windycloud.com with a plan already chosen: send them straight
+  // to Stripe rather than making them find the same button a second time.
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const plan = params.get("plan");
+    const wanted = params.get("cycle") === "annual" ? "yearly" : "monthly";
+    if (!plan || !isPurchasable(plan)) return;
+    setCycle(wanted);
+    window.history.replaceState({}, "", window.location.pathname);
+    void buy(plan, wanted);
+    // Runs once on mount; buy() is stable enough for this one-shot handoff.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   useEffect(() => {
     getBillingUsage().then(setUsage).catch(() => {});
@@ -131,6 +163,27 @@ export default function Billing() {
           transcription and translation come with your storage. Buy from either
           product and it unlocks both.
         </p>
+
+        <div className="inline-flex rounded-lg border border-[var(--border)] p-1 mb-4">
+          {(["monthly", "yearly"] as const).map((c) => (
+            <button
+              key={c}
+              onClick={() => setCycle(c)}
+              className={`px-3 py-1.5 text-sm rounded-md transition-colors ${
+                cycle === c
+                  ? "bg-[var(--accent)] text-white"
+                  : "text-[var(--text-muted)] hover:text-[var(--text)]"
+              }`}
+            >
+              {c === "monthly" ? "Monthly" : "Yearly"}
+              {c === "yearly" && (
+                <span className="ml-1.5 text-[10px] font-semibold">
+                  2 months free
+                </span>
+              )}
+            </button>
+          ))}
+        </div>
         <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
           {plans.map((p) => (
             <div
@@ -144,6 +197,19 @@ export default function Billing() {
               <p className="text-sm text-[var(--text-muted)]">
                 {p.storage_display}
               </p>
+              {isPurchasable(p.plan_id) ? (
+                <button
+                  onClick={() => buy(p.plan_id, cycle)}
+                  disabled={buying !== null}
+                  className="mt-3 w-full py-2 rounded-lg text-sm font-medium bg-[var(--accent)] text-white disabled:opacity-50 transition-opacity"
+                >
+                  {buying === p.plan_id ? "Starting…" : "Choose"}
+                </button>
+              ) : (
+                <p className="mt-3 text-xs text-[var(--text-muted)]">
+                  {p.plan_id === "free" ? "Included" : "Contact us"}
+                </p>
+              )}
             </div>
           ))}
         </div>

@@ -12,7 +12,7 @@ from __future__ import annotations
 from urllib.parse import urlparse
 
 import httpx
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, HTTPException, Request
 from pydantic import BaseModel
 
 from api.app.config import settings
@@ -71,3 +71,64 @@ async def login(body: LoginRequest):
             pass
         raise HTTPException(status_code=403, detail=detail)
     raise HTTPException(status_code=502, detail="Sign-in failed. Please try again.")
+
+
+# ---------------------------------------------------------------------------
+# Checkout passthrough
+# ---------------------------------------------------------------------------
+
+
+class CheckoutRequest(BaseModel):
+    tier: str
+    billing_type: str = "monthly"
+
+
+@router.post("/checkout")
+async def create_checkout(body: CheckoutRequest, request: Request):
+    """Start a Stripe Checkout for a plan bought from the Windy Cloud console.
+
+    Proxied to the account-server on purpose. There is ONE Stripe integration in
+    the ecosystem and it lives there: one checkout, one webhook, one provisioner.
+    This repo holds no Stripe key at all — a second implementation here would
+    mean a second place that can create a subscription and a second place that
+    can provision entitlements, which is exactly the split that let a Windy Word
+    purchase provision nothing in Cloud for months.
+
+    The caller's own bearer token is forwarded, so the account-server decides who
+    the customer is; this route cannot be used to buy on someone else's behalf.
+    """
+    auth = request.headers.get("authorization")
+    if not auth:
+        raise HTTPException(status_code=401, detail="Sign in to change your plan.")
+
+    target = f"{_account_base()}/api/v1/stripe/create-checkout-session"
+    try:
+        async with httpx.AsyncClient(timeout=15.0) as client:
+            resp = await client.post(
+                target,
+                json={
+                    "tier": body.tier,
+                    "billing_type": body.billing_type,
+                    # Bought on the web, from the Cloud console — not the desktop
+                    # app. `platform` is derived from the tier server-side and is
+                    # deliberately NOT ours to assert.
+                    "source": "web",
+                },
+                headers={"Authorization": auth},
+            )
+    except httpx.HTTPError:
+        raise HTTPException(
+            status_code=502,
+            detail="The account service is unreachable right now. Please try again in a moment.",
+        )
+
+    if resp.status_code == 200:
+        return resp.json()
+    if resp.status_code in (401, 403):
+        raise HTTPException(status_code=401, detail="Please sign in again to change your plan.")
+    detail = "Could not start checkout."
+    try:
+        detail = resp.json().get("error") or detail
+    except Exception:
+        pass
+    raise HTTPException(status_code=resp.status_code, detail=detail)
