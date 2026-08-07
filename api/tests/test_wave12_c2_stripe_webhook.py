@@ -19,8 +19,8 @@ from api.app.db.models import UserPlan, WebhookDelivery
 
 WEBHOOK_SECRET = "whsec_wave12-test-deterministic"
 PRICE_PRO = "price_wave12_pro"
-PRICE_ULTRA = "price_wave12_ultra"
-PRICE_MAX = "price_wave12_max"
+PRICE_ULTRA = "price_wave12_ultra"   # tier id `translate`, displayed "Windy Ultra"
+PRICE_MAX = "price_wave12_max"       # tier id `translate_pro`, displayed "Windy Max"
 
 
 @pytest.fixture(autouse=True)
@@ -28,8 +28,8 @@ def configure_stripe(monkeypatch):
     """Every test in this module gets a populated Stripe config."""
     monkeypatch.setattr(settings, "stripe_webhook_secret", WEBHOOK_SECRET)
     monkeypatch.setattr(settings, "stripe_price_id_pro", PRICE_PRO)
-    monkeypatch.setattr(settings, "stripe_price_id_ultra", PRICE_ULTRA)
-    monkeypatch.setattr(settings, "stripe_price_id_max", PRICE_MAX)
+    monkeypatch.setattr(settings, "stripe_price_id_translate", PRICE_ULTRA)
+    monkeypatch.setattr(settings, "stripe_price_id_translate_pro", PRICE_MAX)
     yield
 
 
@@ -251,7 +251,7 @@ async def test_subscription_created_sets_tier_and_status(client, db_session):
         select(UserPlan).where(UserPlan.identity_id == "test-user-001")
     )
     plan = plan_row.scalar_one()
-    assert plan.tier == "ultra"
+    assert plan.tier == "translate"
     assert plan.billing_status == "active"
     assert plan.stripe_customer_id == "cus_wave12_test"
     assert plan.stripe_subscription_id == "sub_wave12_test"
@@ -262,8 +262,8 @@ async def test_subscription_deleted_downgrades_to_free(client, db_session):
     db_session.add(
         UserPlan(
             identity_id="test-user-001",
-            plan_id="ultra",
-            tier="ultra",
+            plan_id="translate",
+            tier="translate",
             quota_bytes=1024**4,
             stripe_customer_id="cus_wave12_test",
             stripe_subscription_id="sub_wave12_test",

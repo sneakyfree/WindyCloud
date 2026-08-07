@@ -325,33 +325,73 @@ def _format_bytes(b: int) -> str:
 # user allocated via /billing/allocate "free" (5 GB) were on the "same"
 # tier but stored under different names. /plan/upgrade "max" 400'd.
 #
-# Everything now reads from the Wave 2 vocab: free / pro / ultra / max.
-# Placeholders below — see docs/POST_LAUNCH_TODOS.md, pricing team to
-# confirm.
+# 2026-08-07: that Wave 2 vocab (free/pro/ultra/max) was ITSELF a fourth
+# vocabulary — it disagreed with the rest of the ecosystem, where `ultra` and
+# `max` are display names and the database ids are `translate` and
+# `translate_pro`. Prices and quotas here were placeholders that nobody ever
+# replaced, and they were 20-170x larger than the priced contract.
+#
+# Everything now reads the ECOSYSTEM contract, windy-pro/docs/PRICING-TIERS.md.
+# Do not add a tier here without adding it there first.
+
+# Canonical order, cheapest first. Used for the staircase walks below.
+TIER_ORDER: tuple[str, ...] = (
+    "free", "pro", "translate", "translate_pro", "tempest", "tornado", "hurricane",
+)
 
 PLAN_NAMES: dict[str, str] = {
     "free": "Free",
-    "pro": "Pro",
-    "ultra": "Ultra",
-    "max": "Max",
+    "pro": "Windy Pro",
+    "translate": "Windy Ultra",
+    "translate_pro": "Windy Max",
+    "tempest": "Windy Tempest",
+    "tornado": "Windy Tornado",
+    "hurricane": "Windy Hurricane",
 }
 
-# Placeholders — pricing team owns the final values (docs/POST_LAUNCH_TODOS.md).
+# Inbound aliases. This repo used `ultra`/`max` as canonical ids until
+# 2026-08-07 and the rest of the ecosystem uses them as DISPLAY names, so an
+# old client or a cached page can still send either. Normalize on the way in;
+# never store an alias. `breeze`/`gale` were retired Cloud tier names.
+TIER_ALIASES: dict[str, str] = {
+    "ultra": "translate",
+    "max": "translate_pro",
+    "translate-pro": "translate_pro",
+    "breeze": "translate_pro",  # was 100 GB — now inside Max
+    "gale": "tempest",          # was 250 GB — nearest surviving rung
+}
+
+
+def _normalize_tier(tier: str) -> str:
+    """Map any accepted spelling to a canonical tier id."""
+    t = (tier or "").strip().lower()
+    return TIER_ALIASES.get(t, t)
+
+
+# Monthly list price in cents. Hurricane is sales-led: 0 means "Custom",
+# NOT free — never treat it as a zero-cost plan.
 PLAN_PRICES_CENTS: dict[str, int] = {
     "free": 0,
-    "pro": 500,  # $5/mo  for 100 GB
-    "ultra": 1500,  # $15/mo for 1 TB
-    "max": 5000,  # $50/mo for 5 TB
+    "pro": 499,          # $4.99/mo
+    "translate": 899,    # $8.99/mo
+    "translate_pro": 1499,  # $14.99/mo
+    "tempest": 4900,     # $49/mo
+    "tornado": 9900,     # $99/mo
+    "hurricane": 0,      # Custom
 }
 
 
 def _tier_quotas() -> dict[str, int]:
-    """Wave 2 tier quotas — sourced from Settings, not hardcoded."""
+    """Fallback tier→bytes. NOT the authority: the account server sends
+    quota_bytes on every allocate and that wins. See config.py."""
     return {
         "free": settings.tier_quota_free,
         "pro": settings.tier_quota_pro,
-        "ultra": settings.tier_quota_ultra,
-        "max": settings.tier_quota_max,
+        "translate": settings.tier_quota_translate,
+        "translate_pro": settings.tier_quota_translate_pro,
+        "tempest": settings.tier_quota_tempest,
+        "tornado": settings.tier_quota_tornado,
+        "hurricane": settings.tier_quota_hurricane,
     }
 
 
@@ -365,7 +405,7 @@ def _plan_tiers() -> dict[str, dict]:
             "quota_bytes": quotas[tier],
             "price_cents": PLAN_PRICES_CENTS[tier],
         }
-        for tier in ("free", "pro", "ultra", "max")
+        for tier in TIER_ORDER
     }
 
 
@@ -377,12 +417,16 @@ def _price_cents_for_usage(used_bytes: int) -> int:
     """Smallest plan that covers `used_bytes` — that's the month's cost."""
     quotas = _tier_quotas()
     # Walk tiers cheapest-to-most-expensive so we hit the smallest fit.
-    for tier in ("free", "pro", "ultra", "max"):
+    # Hurricane is skipped: its price is 0 ("Custom"), so including it would
+    # quote a huge account as FREE.
+    for tier in TIER_ORDER:
+        if tier == "hurricane":
+            continue
         if used_bytes <= quotas[tier]:
             return PLAN_PRICES_CENTS[tier]
-    # Over the max tier — bill the max tier (over-quota enforcement
+    # Over the largest listed tier — bill that tier (over-quota enforcement
     # happens at the upload gate; this function is a projection).
-    return PLAN_PRICES_CENTS["max"]
+    return PLAN_PRICES_CENTS["tornado"]
 
 
 # Kept as an alias so other call sites still work. Delete once callers migrate.
@@ -393,6 +437,11 @@ class AllocateRequest(BaseModel):
     windy_identity_id: str
     passport_number: str | None = None
     tier: str = "free"
+    # Authoritative quota from the account server, which owns entitlement for
+    # the whole ecosystem. When present it overrides this repo's tier→bytes
+    # table entirely. Omitted by callers that provision outside a purchase
+    # (identity.created, windy-agent hatch), which fall back to the table.
+    quota_bytes: int | None = None
 
     @classmethod
     def _validate_passport(cls, v: str | None) -> str | None:
@@ -425,6 +474,7 @@ async def allocate_plan(
     windy_identity_id: str,
     tier: str,
     passport_number: str | None = None,
+    quota_bytes: int | None = None,
 ) -> UserPlan:
     """Idempotent upsert of a UserPlan for the given identity + tier.
 
@@ -440,10 +490,19 @@ async def allocate_plan(
     """
     from api.app.services.trust_client import TrustInfo, get_trust_client
 
+    tier = _normalize_tier(tier)
     quotas = _tier_quotas()
     if tier not in quotas:
         raise ValueError(f"Unknown tier: {tier}")
-    base_quota = quotas[tier]
+    # The account server's number wins when it sends one — it owns entitlement
+    # and knows about SKUs and top-ups this table cannot represent. Guard
+    # against a negative/absurd value rather than trusting it blindly.
+    if quota_bytes is not None:
+        if quota_bytes < 0:
+            raise ValueError("quota_bytes must not be negative")
+        base_quota = quota_bytes
+    else:
+        base_quota = quotas[tier]
 
     if passport_number:
         trust = await get_trust_client().get_trust(passport_number)
@@ -499,6 +558,7 @@ async def billing_allocate(
             windy_identity_id=body.windy_identity_id,
             tier=body.tier,
             passport_number=body.passport_number,
+            quota_bytes=body.quota_bytes,
         )
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
@@ -558,7 +618,7 @@ async def upgrade_plan(
     it verifies the Stripe payment; a client "Upgrade" button must go through
     that service, never call this endpoint directly.
     """
-    new_plan_id = body.plan_id
+    new_plan_id = _normalize_tier(body.plan_id)
     tiers = _plan_tiers()
     if new_plan_id not in tiers:
         from fastapi import HTTPException

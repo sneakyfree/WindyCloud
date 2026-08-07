@@ -25,9 +25,9 @@ import pytest
 
 def test_plan_tiers_vocabulary_is_wave2_canonical():
     """PLAN_TIERS keys must be the Wave 2 set — no 'basic' anymore."""
-    from api.app.routes.billing import PLAN_TIERS, _tier_quotas
+    from api.app.routes.billing import PLAN_TIERS, TIER_ORDER, _tier_quotas
 
-    assert set(PLAN_TIERS.keys()) == {"free", "pro", "ultra", "max"}
+    assert set(PLAN_TIERS.keys()) == set(TIER_ORDER)
     # Same key set as the authoritative quota map.
     assert set(PLAN_TIERS.keys()) == set(_tier_quotas().keys())
 
@@ -77,13 +77,14 @@ async def test_upgrade_to_max_tier_accepted(client, monkeypatch):
     monkeypatch.setattr(settings, "service_token", "g17-tok")
     resp = await client.post(
         "/api/v1/billing/plan/upgrade",
+        # "max" is a display alias; the route normalizes it to `translate_pro`.
         json={"plan_id": "max", "windy_identity_id": "test-user-001"},
         headers={"X-Service-Token": "g17-tok"},
     )
     assert resp.status_code == 200, resp.text
     body = resp.json()
-    assert body["plan_id"] == "max"
-    assert body["quota_bytes"] == 5_497_558_138_880  # 5 TB
+    assert body["plan_id"] == "translate_pro"
+    assert body["quota_bytes"] == settings.tier_quota_translate_pro
 
 
 @pytest.mark.asyncio
@@ -104,13 +105,16 @@ async def test_upgrade_to_basic_rejected(client, monkeypatch):
 def test_price_for_usage_picks_smallest_fit():
     from api.app.routes.billing import PLAN_PRICES_CENTS, _price_cents_for_usage
 
-    # 1 GB fits in free (5 GB) → free price
-    assert _price_cents_for_usage(1 * 1024**3) == PLAN_PRICES_CENTS["free"]
-    # 50 GB fits in pro (100 GB) → pro price
-    assert _price_cents_for_usage(50 * 1024**3) == PLAN_PRICES_CENTS["pro"]
-    # 500 GB fits in ultra (1 TB) → ultra price
-    assert _price_cents_for_usage(500 * 1024**3) == PLAN_PRICES_CENTS["ultra"]
-    # 2 TB fits in max (5 TB) → max price
-    assert _price_cents_for_usage(2 * 1024**4) == PLAN_PRICES_CENTS["max"]
-    # Over 5 TB still bills max (over-quota is an upload-gate concern)
-    assert _price_cents_for_usage(10 * 1024**4) == PLAN_PRICES_CENTS["max"]
+    # 100 MB fits in free (500 MB) → free price
+    assert _price_cents_for_usage(100 * 1024**2) == PLAN_PRICES_CENTS["free"]
+    # 3 GB fits in pro (5 GB) → pro price
+    assert _price_cents_for_usage(3 * 1024**3) == PLAN_PRICES_CENTS["pro"]
+    # 20 GB fits in translate / "Windy Ultra" (25 GB)
+    assert _price_cents_for_usage(20 * 1024**3) == PLAN_PRICES_CENTS["translate"]
+    # 80 GB fits in translate_pro / "Windy Max" (100 GB)
+    assert _price_cents_for_usage(80 * 1024**3) == PLAN_PRICES_CENTS["translate_pro"]
+    # 1.5 TB fits in tornado (2 TB)
+    assert _price_cents_for_usage(1536 * 1024**3) == PLAN_PRICES_CENTS["tornado"]
+    # Over the largest listed tier still bills tornado, NEVER hurricane —
+    # hurricane's price is 0 ("Custom"), so quoting it would read as free.
+    assert _price_cents_for_usage(10 * 1024**4) == PLAN_PRICES_CENTS["tornado"]

@@ -13,6 +13,7 @@ from cryptography.hazmat.primitives import serialization
 from cryptography.hazmat.primitives.asymmetric import ec
 from sqlalchemy import select
 
+from api.app.config import settings
 from api.app.db.models import IdentityBridge, UserPlan
 
 WEBHOOK_SECRET = "test-hmac-secret-v1"
@@ -85,7 +86,7 @@ async def test_identity_created_provisions_free_plan(client, db_session, hmac_se
     plan = (
         await db_session.execute(select(UserPlan).where(UserPlan.identity_id == "new-user-1"))
     ).scalar_one()
-    assert plan.quota_bytes == 5_368_709_120
+    assert plan.quota_bytes == settings.tier_quota_free
     assert plan.frozen is False
 
 

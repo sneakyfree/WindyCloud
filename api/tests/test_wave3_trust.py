@@ -8,6 +8,7 @@ import pytest
 from httpx import ASGITransport, AsyncClient
 from sqlalchemy import select
 
+from api.app.config import settings
 from api.app.db.models import IdentityBridge, UserPlan
 from api.app.services.trust_client import TrustInfo
 
@@ -80,8 +81,8 @@ async def test_exceptional_bot_gets_5x_quota(client, db_session, service_token, 
     )
     assert resp.status_code == 200, resp.text
     body = resp.json()
-    # pro base = 100 GB; multiplier 5 → 500 GB
-    assert body["quota_bytes"] == 107_374_182_400 * 5
+    # multiplier 5 applies to the pro base quota
+    assert body["quota_bytes"] == settings.tier_quota_pro * 5
 
     plan = (
         await db_session.execute(select(UserPlan).where(UserPlan.identity_id == "bot-exc"))
@@ -120,7 +121,7 @@ async def test_human_no_passport_base_quota(client, db_session, service_token, t
         headers={"X-Service-Token": service_token},
     )
     assert resp.status_code == 200
-    assert resp.json()["quota_bytes"] == 107_374_182_400  # 100 GB, un-multiplied
+    assert resp.json()["quota_bytes"] == settings.tier_quota_pro  # un-multiplied
 
     plan = (
         await db_session.execute(select(UserPlan).where(UserPlan.identity_id == "human-1"))
@@ -141,7 +142,7 @@ async def test_verified_bot_2x_quota(client, service_token, trust_stub):
         headers={"X-Service-Token": service_token},
     )
     assert resp.status_code == 200
-    assert resp.json()["quota_bytes"] == 5_368_709_120 * 2  # 10 GB
+    assert resp.json()["quota_bytes"] == settings.tier_quota_free * 2
 
 
 # ---------------------------------------------------------------------------

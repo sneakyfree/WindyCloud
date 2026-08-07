@@ -121,18 +121,31 @@ def _verify_stripe_signature(body: bytes, header: str, secret: str) -> int:
 
 
 def _price_id_to_tier(price_id: str | None) -> str | None:
-    """Return "pro" / "ultra" / "max" for a known price, else None.
+    """Return a canonical tier id for a known price, else None.
 
     Unknown price ids explicitly map to None rather than "free" — we
     don't want to silently downgrade a user because the Stripe catalog
     changed ahead of our env config.
+
+    Both the monthly and the YEARLY price of each tier must be here. The
+    account server shipped without its yearly vars once and every annual
+    checkout 400'd with "price not configured"; an annual price missing here
+    would instead resolve to None and silently fail to upgrade a paying
+    customer, which is worse because nothing errors.
     """
     if not price_id:
         return None
     mapping = {
         settings.stripe_price_id_pro: "pro",
-        settings.stripe_price_id_ultra: "ultra",
-        settings.stripe_price_id_max: "max",
+        settings.stripe_price_id_pro_yearly: "pro",
+        settings.stripe_price_id_translate: "translate",
+        settings.stripe_price_id_translate_yearly: "translate",
+        settings.stripe_price_id_translate_pro: "translate_pro",
+        settings.stripe_price_id_translate_pro_yearly: "translate_pro",
+        settings.stripe_price_id_tempest: "tempest",
+        settings.stripe_price_id_tempest_yearly: "tempest",
+        settings.stripe_price_id_tornado: "tornado",
+        settings.stripe_price_id_tornado_yearly: "tornado",
     }
     mapping.pop("", None)  # Unconfigured env vars map empty-string → drop.
     return mapping.get(price_id)

@@ -101,7 +101,7 @@ class Settings(BaseSettings):
     # sources of truth for "free tier" that silently disagreed. Now it
     # tracks `tier_quota_free` by default; override only if you actively
     # want the un-provisioned fallback to differ from the free-tier plan.
-    default_storage_quota: int = 5_368_709_120  # 5 GB, matches tier_quota_free
+    default_storage_quota: int = 524_288_000  # 500 MB, matches tier_quota_free
     # Per-upload size ceiling. Must sit well under Fargate task memory
     # (CLOUD_DEPLOYMENT.md §5.2 provisions 1024 MB) so a single legit
     # max-sized upload can't OOM a worker. ALB / WAF should enforce the
@@ -109,13 +109,31 @@ class Settings(BaseSettings):
     max_upload_size: int = 268_435_456  # 256 MB
     max_servers_per_user: int = 5
 
-    # Tier quotas (bytes) — Wave 2 contract #1. The canonical vocab:
-    # free / pro / ultra / max. `PLAN_TIERS` in routes/billing.py reads
-    # from these.
-    tier_quota_free: int = 5_368_709_120  # 5 GB
-    tier_quota_pro: int = 107_374_182_400  # 100 GB
-    tier_quota_ultra: int = 1_099_511_627_776  # 1 TB
-    tier_quota_max: int = 5_497_558_138_880  # 5 TB
+    # ─── Tier quotas (bytes) ────────────────────────────────────────────
+    # ⚠️ These are a FALLBACK, not the authority. The account server sends
+    # `quota_bytes` on every /billing/allocate call and that number wins;
+    # this table is used only for identities created outside a purchase
+    # (the identity.created webhook, windy-agent's hatch). It MUST mirror
+    # windy-pro/docs/PRICING-TIERS.md — see the note below for why.
+    #
+    # The canonical vocab is now the ECOSYSTEM one:
+    #   free / pro / translate / translate_pro / tempest / tornado / hurricane
+    # `translate` is displayed as "Windy Ultra" and `translate_pro` as
+    # "Windy Max". This repo used bare `ultra`/`max` as canonical ids until
+    # 2026-08-07; those are display aliases everywhere else in the ecosystem
+    # and are now accepted only as inbound aliases (see _normalize_tier).
+    #
+    # The old numbers here (free 5 GB / pro 100 GB / ultra 1 TB / max 5 TB)
+    # were this repo's private ladder and disagreed with the priced contract
+    # by up to 170x — Cloud's "free" alone was 10x the contract's. Two systems
+    # each believing they owned the ladder is exactly the bug this fixes.
+    tier_quota_free: int = 524_288_000  # 500 MB
+    tier_quota_pro: int = 5_368_709_120  # 5 GB
+    tier_quota_translate: int = 26_843_545_600  # 25 GB  (Windy Ultra)
+    tier_quota_translate_pro: int = 107_374_182_400  # 100 GB (Windy Max)
+    tier_quota_tempest: int = 1_099_511_627_776  # 1 TB
+    tier_quota_tornado: int = 2_199_023_255_552  # 2 TB
+    tier_quota_hurricane: int = 5_497_558_138_880  # 5 TB floor; sold per contract
 
     # Shared secrets for service-to-service calls
     identity_webhook_secret: str = ""  # HMAC secret for /webhooks/identity/created
@@ -131,8 +149,18 @@ class Settings(BaseSettings):
     stripe_webhook_secret: str = ""
     stripe_secret_key: str = ""
     stripe_price_id_pro: str = ""
-    stripe_price_id_ultra: str = ""
-    stripe_price_id_max: str = ""
+    stripe_price_id_translate: str = ""       # Windy Ultra
+    stripe_price_id_translate_pro: str = ""   # Windy Max
+    stripe_price_id_tempest: str = ""
+    stripe_price_id_tornado: str = ""
+    # Annual equivalents. The account server's yearly price vars did not exist
+    # until 2026-08-07 and annual checkouts 400'd with "price not configured";
+    # do not repeat that here.
+    stripe_price_id_pro_yearly: str = ""
+    stripe_price_id_translate_yearly: str = ""
+    stripe_price_id_translate_pro_yearly: str = ""
+    stripe_price_id_tempest_yearly: str = ""
+    stripe_price_id_tornado_yearly: str = ""
 
     # Sentry
     sentry_dsn: str = ""
