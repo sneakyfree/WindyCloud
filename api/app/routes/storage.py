@@ -311,11 +311,16 @@ def _storage_plans() -> list[StoragePlan]:
     """Wave 7 G17+G18 — one vocab. Reads tier quotas from settings and
     prices from `routes/billing.PLAN_PRICES_CENTS` so every surface
     (upgrade, allocate, public /plans) agrees."""
-    from api.app.routes.billing import PLAN_NAMES, PLAN_PRICES_CENTS, _tier_quotas
+    from api.app.routes.billing import (
+        PLAN_NAMES,
+        PLAN_PRICES_CENTS,
+        TIER_ORDER,
+        _tier_quotas,
+    )
 
     quotas = _tier_quotas()
     plans: list[StoragePlan] = []
-    for tier in ("free", "pro", "ultra", "max"):
+    for tier in TIER_ORDER:
         price = PLAN_PRICES_CENTS[tier]
         plans.append(
             StoragePlan(

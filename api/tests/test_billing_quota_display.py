@@ -23,9 +23,10 @@ import pytest
 from api.app.config import settings
 from api.app.db.models import FileRecord, UserPlan
 
-# 200 GB — deliberately equal to NO tier quota (free 5 GB, pro 100 GB,
-# ultra 1 TB, max 5 TB) and not to default_storage_quota. E.g. a "pro"
-# plan allocated with a 2.0 trust multiplier.
+# 200 GB — deliberately equal to NO tier quota on the ecosystem ladder
+# (free 500 MB, pro 5 GB, translate 25 GB, translate_pro 100 GB, tempest
+# 1 TB, tornado 2 TB) and not to default_storage_quota. E.g. a "pro" plan
+# allocated with a large trust multiplier.
 EFFECTIVE_QUOTA = 214_748_364_800
 
 AUTH = {"Authorization": "Bearer fake"}
@@ -125,7 +126,7 @@ async def test_plan_reports_effective_quota_not_tier_table(client, db_session):
     assert resp.status_code == 200
     body = resp.json()
     assert body["plan_id"] == "pro"
-    assert body["name"] == "Pro"
+    assert body["name"] == "Windy Pro"
     # The trust-multiplied effective quota — NOT settings.tier_quota_pro.
     assert body["quota_bytes"] == EFFECTIVE_QUOTA
     assert body["quota_bytes"] != settings.tier_quota_pro

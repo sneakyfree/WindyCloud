@@ -306,6 +306,23 @@ export function getPlans(): Promise<{ plans: StoragePlan[] }> {
   return apiFetch("/storage/plans");
 }
 
+/**
+ * Start a Stripe Checkout for a plan.
+ *
+ * Proxied through this API to the account-server, which owns the ONE Stripe
+ * integration in the ecosystem. No Stripe key ever reaches the browser.
+ */
+export function startCheckout(
+  tier: string,
+  billingType: "monthly" | "yearly",
+): Promise<{ url: string }> {
+  return apiFetch("/auth/checkout", {
+    method: "POST",
+    headers: jsonHeaders(),
+    body: JSON.stringify({ tier, billing_type: billingType }),
+  });
+}
+
 // --- Sync ---
 
 export interface SyncProduct {

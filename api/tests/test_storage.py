@@ -4,6 +4,8 @@ from __future__ import annotations
 
 import pytest
 
+from api.app.config import settings
+
 
 @pytest.mark.asyncio
 async def test_upload_and_list(client):
@@ -81,7 +83,7 @@ async def test_usage_endpoint(client):
     assert usage["used_bytes"] == 0
     # Wave 7 G18: default_storage_quota now tracks tier_quota_free (5 GB)
     # instead of the legacy 500 MB. One number for "free tier", everywhere.
-    assert usage["quota_bytes"] == 5_368_709_120
+    assert usage["quota_bytes"] == settings.tier_quota_free
 
     # Upload a file
     await client.post(
@@ -154,19 +156,23 @@ async def test_storage_health(client):
 async def test_storage_plans_no_auth(client):
     """Plans endpoint should be public (no auth required).
 
-    Wave 7 G17: the /storage/plans tier vocab is the Wave 2 canonical
-    one — free / pro / ultra / max. The old "basic" tier is gone; a
-    user previously on "basic" got 5 GB, which matches the new "free".
+    Wave 7 G17 unified the vocabulary; 2026-08-07 replaced it with the
+    ecosystem canon (windy-pro/docs/PRICING-TIERS.md), so the list is
+    driven by TIER_ORDER rather than a hardcoded copy of it.
     """
+    from api.app.routes.billing import TIER_ORDER
+
     resp = await client.get("/api/v1/storage/plans")
     assert resp.status_code == 200
     plans = resp.json()["plans"]
-    assert [p["plan_id"] for p in plans] == ["free", "pro", "ultra", "max"]
+    assert [p["plan_id"] for p in plans] == list(TIER_ORDER)
     assert plans[0]["price_cents_per_month"] == 0
-    assert plans[0]["storage_display"] == "5 GB"
-    assert plans[1]["storage_display"] == "100 GB"
-    assert plans[2]["storage_display"] == "1 TB"
-    assert plans[3]["storage_display"] == "5 TB"
+    assert plans[0]["storage_display"] == "500 MB"   # free
+    assert plans[1]["storage_display"] == "5 GB"     # pro
+    assert plans[2]["storage_display"] == "25 GB"    # translate  / Windy Ultra
+    assert plans[3]["storage_display"] == "100 GB"   # translate_pro / Windy Max
+    assert plans[4]["storage_display"] == "1 TB"     # tempest
+    assert plans[5]["storage_display"] == "2 TB"     # tornado
 
 
 @pytest.mark.asyncio
