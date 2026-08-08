@@ -2,6 +2,17 @@ import { Cloud, Loader2 } from "lucide-react";
 import { useState, type FormEvent } from "react";
 import { setToken } from "../api";
 
+
+/**
+ * Post-login destination from ?next=. Same-site RELATIVE paths only: it must
+ * start with "/" and not "//" (protocol-relative smuggling) — anything else
+ * falls back to home. This is what carries a chosen plan across the login wall.
+ */
+function nextDestination(): string {
+  const next = new URLSearchParams(window.location.search).get("next") || "";
+  return next.startsWith("/") && !next.startsWith("//") ? next : "/";
+}
+
 export default function Login() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -28,7 +39,7 @@ export default function Login() {
       const token = data.token || data.jwt || data.access_token;
       if (!token) throw new Error("Sign-in failed — no token returned.");
       setToken(token);
-      window.location.href = "/";
+      window.location.href = nextDestination();
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : "Sign-in failed.");
     } finally {
@@ -39,7 +50,7 @@ export default function Login() {
   const handleTokenLogin = () => {
     if (jwt.trim()) {
       setToken(jwt.trim());
-      window.location.href = "/";
+      window.location.href = nextDestination();
     }
   };
 

@@ -1,4 +1,4 @@
-import { BrowserRouter, Navigate, Route, Routes } from "react-router-dom";
+import { BrowserRouter, Navigate, Route, Routes, useLocation } from "react-router-dom";
 import { isLoggedIn } from "./api";
 import Layout from "./Layout";
 import Billing from "./pages/Billing";
@@ -13,7 +13,16 @@ import Servers from "./pages/Servers";
 import SettingsPage from "./pages/SettingsPage";
 
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
-  if (!isLoggedIn()) return <Navigate to="/login" replace />;
+  const location = useLocation();
+  if (!isLoggedIn()) {
+    // Carry the intended destination through the login wall. Without this,
+    // "Choose Ultra" on windycloud.com landed here as /billing?plan=translate,
+    // bounced to /login with the query DROPPED, and after signing in the user
+    // was sent to the home page — the entire buy funnel died at the door for
+    // every new customer.
+    const next = encodeURIComponent(location.pathname + location.search);
+    return <Navigate to={`/login?next=${next}`} replace />;
+  }
   return <>{children}</>;
 }
 
