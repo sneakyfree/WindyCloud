@@ -113,6 +113,11 @@ async def create_checkout(body: CheckoutRequest, request: Request):
                     # app. `platform` is derived from the tier server-side and is
                     # deliberately NOT ours to assert.
                     "source": "web",
+                    # Bring the buyer back HERE after Stripe, not to the Windy
+                    # Word app. Set server-side (never from the client) and
+                    # validated against an allowlist on the account-server side;
+                    # older account-server builds simply ignore the field.
+                    "return_to": "https://cloud.windycloud.com/billing",
                 },
                 headers={"Authorization": auth},
             )
